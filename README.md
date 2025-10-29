@@ -1,3 +1,219 @@
+# 💰 Financial Assistant Chatbot | Chatbot Financiero
+
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/flask-3.1-green.svg)](https://flask.palletsprojects.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-Integration-25D366.svg)](https://www.twilio.com/whatsapp)
+
+[English](#english) | [Español](#español)
+
+---
+
+<a name="english"></a>
+## 🇬🇧 English
+
+> AI-powered financial education assistant with budget simulators, interactive dashboard, and user memory. Deployable on NAS with Docker. Available via web and WhatsApp.
+
+### 📸 Screenshots
+
+<div align="center">
+
+![Web Chat](images/web-chat.png)
+
+![Dashboard](images/dashboard.png)
+
+![WhatsApp](images/whatsapp.png)
+
+</div>
+
+### 📋 Overview
+
+This project implements an intelligent financial chatbot built with Flask that works through web interface and WhatsApp. Key features include:
+
+**🤖 Conversational AI:**
+- Intent detection (budget, savings, investments, debt, calculators, education)
+- Context-aware responses with memory across conversations
+- Natural language processing for financial queries
+
+**📊 Interactive Dashboard:**
+- Budget visualization (50/30/20 rule)
+- Compound interest simulator
+- Investment comparison charts
+- Real-time data with Plotly
+
+**💾 User Persistence:**
+- SQLite database with SQLAlchemy
+- Stores: income, debts, risk profile, savings goals
+- Cross-channel identity management
+
+**🔐 Identity & Sessions:**
+- Web: Cookie-based `uid` via login (DNI or nickname)
+- WhatsApp: User ID from phone number
+- Linking: Secure one-time token to connect WhatsApp → Web
+
+**🐳 Easy Deployment:**
+- Docker & Docker Compose ready
+- Optimized for NAS deployment
+- Optional ngrok tunnel for public access
+
+### 🏗️ Architecture
+
+Backend: Flask (Python 3.12) · SQLite + SQLAlchemy · Twilio WhatsApp API  
+Frontend: Responsive HTML/CSS/JS · Plotly.js  
+Infra: Docker containers · Health checks · Volume persistence
+
+### 🚀 Quick Start
+
+```bash
+# Clone repository
+git clone https://github.com/rAmIro-89/finance-assistant-bot.git
+cd finance-assistant-bot
+
+# Start services
+docker-compose up -d
+
+# Check health
+curl http://localhost:5000/health
+```
+
+Access:
+- Chat: http://localhost:5000/
+- Dashboard: http://localhost:5000/dashboard
+
+### 📡 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Web chat interface |
+| `/api/chat` | POST | Process chat messages |
+| `/dashboard` | GET | Interactive dashboard |
+| `/health` | GET | Health check |
+| `/api/user` | GET | Current user profile |
+| `/api/login` | POST | Web login (DNI/nickname) |
+| `/api/logout` | POST | Web logout |
+| `/whatsapp-webhook` | POST | WhatsApp inbound messages |
+| `/claim/<token>` | GET | Link WhatsApp to web session |
+
+### 💬 WhatsApp Integration
+1. Configure Twilio webhook: `https://YOUR_DOMAIN/whatsapp-webhook`
+2. Send "vincular" via WhatsApp to receive a one-time link
+3. Click the link to access your dashboard with WhatsApp data
+
+### 📦 NAS Deployment
+See comprehensive guide: [`docs/DEPLOY_NAS.md`](docs/DEPLOY_NAS.md)
+
+### 🧪 Testing
+
+```bash
+pip install -r requirements.txt
+pytest tests/
+```
+
+### 📄 License
+MIT License — see [`LICENSE`](LICENSE).  
+Author: Ramiro Ottone Villar
+
+---
+
+<a name="español"></a>
+## 🇦🇷 Español
+
+> Asistente educativo financiero con simuladores, dashboard interactivo y memoria por usuario. Desplegable en NAS con Docker. Disponible vía web y WhatsApp.
+
+### 📸 Capturas de Pantalla
+
+<div align="center">
+
+![Interfaz de Chat Web](images/web-chat.png)
+
+![Dashboard Interactivo](images/dashboard.png)
+
+![Integración con WhatsApp](images/whatsapp.png)
+
+</div>
+
+### 📋 Resumen
+
+Este proyecto implementa un chatbot financiero inteligente construido con Flask que funciona a través de interfaz web y WhatsApp. Características principales:
+
+**🤖 IA Conversacional:**
+- Detección de intenciones (presupuesto, ahorro, inversiones, deudas, calculadoras, educación)
+- Respuestas contextuales con memoria entre conversaciones
+- Procesamiento de lenguaje natural para consultas financieras
+
+**📊 Dashboard Interactivo:**
+- Visualización de presupuesto (regla 50/30/20)
+- Simulador de interés compuesto
+- Gráficos de comparación de inversiones
+- Datos en tiempo real con Plotly
+
+**💾 Persistencia de Usuario:**
+- Base de datos SQLite con SQLAlchemy
+- Almacena: ingresos, deudas, perfil de riesgo, metas de ahorro
+- Gestión de identidad multi-canal
+
+**🔐 Identidad y Sesiones:**
+- Web: Cookie `uid` vía login (DNI o nickname)
+- WhatsApp: ID de usuario desde número telefónico
+- Vinculación: Token seguro de un solo uso para conectar WhatsApp → Web
+
+**🐳 Despliegue Fácil:**
+- Docker & Docker Compose listo
+- Optimizado para despliegue en NAS
+- Túnel ngrok opcional para acceso público
+
+### 🏗️ Arquitectura
+
+Backend: Flask (Python 3.12) · SQLite + SQLAlchemy · API de WhatsApp Twilio  
+Frontend: HTML/CSS/JS responsivo · Plotly.js  
+Infra: Contenedores Docker · Health checks · Persistencia con volúmenes
+
+### 🚀 Inicio Rápido
+
+```bash
+git clone https://github.com/rAmIro-89/finance-assistant-bot.git
+cd finance-assistant-bot
+docker-compose up -d
+curl http://localhost:5000/health
+```
+
+Acceso:
+- Chat: http://localhost:5000/
+- Dashboard: http://localhost:5000/dashboard
+
+### 📡 Endpoints de API
+
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/` | GET | Interfaz de chat web |
+| `/api/chat` | POST | Procesar mensajes del chat |
+| `/dashboard` | GET | Dashboard interactivo |
+| `/health` | GET | Verificación de salud |
+| `/api/user` | GET | Perfil del usuario actual |
+| `/api/login` | POST | Login web (DNI/nickname) |
+| `/api/logout` | POST | Logout web |
+| `/whatsapp-webhook` | POST | Mensajes entrantes de WhatsApp |
+| `/claim/<token>` | GET | Vincular WhatsApp a sesión web |
+
+### 💬 Integración con WhatsApp
+1. Configurar webhook de Twilio: `https://TU_DOMINIO/whatsapp-webhook`
+2. Enviar "vincular" por WhatsApp para recibir enlace de un solo uso
+3. Hacer clic en el enlace para acceder al dashboard con datos de WhatsApp
+
+### 📦 Despliegue en NAS
+Ver guía completa: [`docs/DEPLOY_NAS.md`](docs/DEPLOY_NAS.md)
+
+### 🧪 Testing
+
+```bash
+pip install -r requirements.txt
+pytest tests/
+```
+
+### 📄 Licencia
+Licencia MIT — ver [`LICENSE`](LICENSE).  
+Autor: Ramiro Ottone Villar
 # 💰 Financial Assistant Chatbot | Chatbot Financiero# 💰 Financial Assistant Chatbot | Chatbot Financiero# Chatbot Financiero 24/7 (Web + WhatsApp)
 
 
