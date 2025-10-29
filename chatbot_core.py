@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 import csv
 import random
 import re
+import unicodedata
 from difflib import SequenceMatcher
 from calculators import (
     calcular_interes_compuesto, calcular_cuota_prestamo,
@@ -27,6 +28,26 @@ def stamp(dt: Optional[datetime] = None) -> str:
     dt = dt or datetime.now()
     periodo = "noche" if is_night(dt) else "día"
     return f"[{dt.strftime('%H:%M')} {periodo}]"
+
+
+def normalize_text(text: str) -> str:
+    """
+    Normaliza el texto para mejorar la detección:
+    - Convierte a minúsculas
+    - Elimina acentos y diacríticos
+    - Preserva números y espacios
+    """
+    # Convertir a minúsculas
+    text = text.lower()
+    
+    # Eliminar acentos (NFD normaliza y separamos los diacríticos)
+    text = unicodedata.normalize('NFD', text)
+    text = ''.join(char for char in text if unicodedata.category(char) != 'Mn')
+    
+    # Normalizar espacios múltiples
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
 
 
 def log_interaction(ts: datetime, scenario: str, user: str, bot: str, 
@@ -89,29 +110,49 @@ def greeting(dt: datetime, sentiment: str = "neutral", emotion: str = "none") ->
 
 class ChatBot:
     def __init__(self):
-        # Sinónimos y variaciones naturales
+        # Keywords ya normalizadas (sin acentos, minúsculas)
+        # Ahora son más flexibles y naturales
         self.keywords = {
-            "presupuesto": ["presupuesto", "gastos", "ingresos", "planificar", "organizar", "dinero", 
-                           "cuanto gasto", "administrar", "controlar", "distribuir", "plata",
-                           "sueldo", "salario", "cobro", "pago", "cuanto tengo", "alcanza"],
+            "presupuesto": [
+                "presupuesto", "gastos", "ingresos", "planificar", "organizar", "dinero", 
+                "cuanto gasto", "administrar", "controlar", "distribuir", "plata",
+                "sueldo", "salario", "cobro", "pago", "cuanto tengo", "alcanza",
+                "economia domestica", "finanzas personales", "mis cuentas"
+            ],
             
-            "ahorro": ["ahorrar", "ahorro", "guardar", "meta", "objetivo", "juntar", "reservar",
-                      "quiero comprar", "necesito", "voy a comprar", "planeo", "juntando",
-                      "guardando", "economizar", "separar"],
+            "ahorro": [
+                "ahorrar", "ahorro", "ahorros", "guardar", "meta", "objetivo", "juntar", "reservar",
+                "quiero comprar", "necesito", "voy a comprar", "planeo", "juntando",
+                "guardando", "economizar", "separar", "alcancia"
+            ],
             
-            "inversiones": ["invertir", "inversión", "acciones", "bonos", "plazo fijo", "crypto", 
-                           "fondos", "donde pongo", "rentabilidad", "ganar", "multiplicar",
-                           "hacer crecer", "rendimiento", "que me conviene", "mejor opcion"],
+            "inversiones": [
+                "invertir", "inversion", "inversiones", "acciones", "bonos", 
+                "plazo fijo", "crypto", "criptomonedas", "fondos", "donde pongo", 
+                "rentabilidad", "ganar", "multiplicar", "hacer crecer", "rendimiento", 
+                "que me conviene", "mejor opcion", "aguinaldo", "sueldo anual", 
+                "bonus", "prima", "cedear", "etf", "fci"
+            ],
             
-            "deudas": ["deuda", "préstamo", "crédito", "tarjeta", "cuota", "intereses", 
-                      "debo", "pagar", "prestan", "financiación", "adeudo", "cancelar",
-                      "saldar", "cuotas", "mensualidades", "banco"],
+            "deudas": [
+                "deuda", "deudas", "prestamo", "credito", "tarjeta", 
+                "cuota", "intereses", "debo", "pagar", "prestan", "financiacion",
+                "adeudo", "cancelar", "saldar", "cuotas", "mensualidades", "banco",
+                "me atrase", "no puedo pagar", "refinanciar"
+            ],
             
-            "educacion": ["aprender", "enseñar", "explicar", "que es", "como funciona", 
-                         "no entiendo", "concepto", "significa", "quiere decir", "ayuda a entender"],
+            "educacion": [
+                "aprender", "ensenar", "explicar", "que es", "como funciona", 
+                "no entiendo", "concepto", "significa", "quiere decir", "ayuda a entender",
+                "me gustaria saber", "quisiera saber", "podrias explicar", "podrías explicar",
+                "curso", "tutorial", "ensenanza"
+            ],
             
-            "calculadora": ["calcular", "calcula", "cuanto", "simular", "simulador",
-                           "en cuanto tiempo", "cuota", "plazo", "rendimiento", "comparar"],
+            "calculadora": [
+                "calcular", "calcula", "cuanto", "simular", "simulador",
+                "en cuanto tiempo", "cuota", "plazo", "rendimiento", "comparar",
+                "dame numeros", "hazme cuentas", "sacame la cuenta"
+            ],
         }
         
         # Patrones de intención (frases típicas)
@@ -222,7 +263,33 @@ class ChatBot:
         return sentiment, emotion
 
     def detect(self, text: str) -> str:
-        t = text.lower()
+        # NORMALIZAR el texto primero (sin acentos, minúsculas, etc.)
+        t = normalize_text(text)
+        
+        # 0. Detección directa de palabras clave sueltas (mejorada con normalización)
+        if len(t.split()) <= 2:
+            single_word_map = {
+                # Todas normalizadas (sin acentos)
+                "presupuesto": "presupuesto",
+                "presupuestos": "presupuesto",
+                "ahorro": "ahorro",
+                "ahorrar": "ahorro",
+                "ahorros": "ahorro",
+                "inversion": "inversiones",
+                "inversiones": "inversiones",
+                "invertir": "inversiones",
+                "deuda": "deudas",
+                "deudas": "deudas",
+                "prestamo": "deudas",
+                "tarjeta": "deudas",
+                "educacion": "educacion",
+                "aprender": "educacion",
+                "calculadora": "calculadora",
+                "calcular": "calculadora",
+            }
+            for word in t.split():
+                if word in single_word_map:
+                    return single_word_map[word]
         
         # 1. Si estamos esperando información específica (respuestas cortas)
         if self.conversation_state['waiting_for']:
@@ -257,10 +324,14 @@ class ChatBot:
             if self.last_scenario:
                 return self.last_scenario
         
-        # 3. Normalizar texto (remover artículos y palabras vacías)
-        stop_words = ["el", "la", "los", "las", "un", "una", "de", "del", "al", "para", 
-                     "por", "con", "en", "a", "y", "o", "pero", "que", "mi", "me", "te"]
-        words = [w for w in t.split() if w not in stop_words]
+        # 3. Remover palabras vacías (stop words) para mejor detección
+        stop_words = {
+            "el", "la", "los", "las", "un", "una", "de", "del", "al", "para", 
+            "por", "con", "en", "a", "y", "o", "pero", "que", "mi", "me", "te",
+            "lo", "su", "sus", "se", "si", "no", "es", "son", "muy", "mas",
+            "como", "cuando", "donde", "quien", "cual"
+        }
+        words = [w for w in t.split() if w not in stop_words and len(w) > 2]
         normalized = " ".join(words)
         
         # 3. Detección por patrones de intención (frases completas)
@@ -270,23 +341,48 @@ class ChatBot:
                 if pattern in t:
                     pattern_scores[scen] += 3  # Mayor peso a patrones de intención
         
-        # 4. Detección por keywords con similitud difusa
+        # 4. Detección por keywords (ahora más flexible con normalización)
         keyword_scores = {scen: 0 for scen in self.keywords.keys()}
         for scen, keys in self.keywords.items():
             for keyword in keys:
-                # Busqueda exacta
-                if keyword in t or keyword in normalized:
+                # Normalizar la keyword también
+                keyword_norm = normalize_text(keyword)
+                
+                # Búsqueda exacta (más peso)
+                if keyword_norm in t or keyword_norm in normalized:
                     keyword_scores[scen] += 2
-                else:
-                    # Búsqueda aproximada (para typos y variaciones)
-                    for word in words:
-                        if len(word) > 3 and self.similarity(word, keyword) > 0.85:
-                            keyword_scores[scen] += 1
+                    continue
+                
+                # Búsqueda de palabras individuales de la keyword
+                keyword_words = keyword_norm.split()
+                if len(keyword_words) > 1:
+                    # Para frases multi-palabra, verificar si todas están
+                    if all(kw in t for kw in keyword_words):
+                        keyword_scores[scen] += 2
+                        continue
+                
+                # Búsqueda aproximada (para typos)
+                for word in words:
+                    if len(word) > 3 and self.similarity(word, keyword_norm) > 0.85:
+                        keyword_scores[scen] += 1
         
         # 5. Combinar puntuaciones
         total_scores = {}
         for scen in self.keywords.keys():
             total_scores[scen] = pattern_scores[scen] + keyword_scores[scen]
+        
+        # 5.5 Boost de educación si hay palabras educativas
+        educational_triggers = ["que es", "como funciona", "explicar", "explicame", 
+                               "ensenar", "aprender", "sobre", "acerca de"]
+        if any(trigger in t for trigger in educational_triggers):
+            # Si es una pregunta educativa, pero también matchea otro escenario fuerte
+            # Dejar que el otro escenario gane si tiene buen score
+            if total_scores.get('educacion', 0) > 0:
+                # Solo dar boost si no hay otro escenario con score alto
+                max_other = max([score for scen, score in total_scores.items() 
+                               if scen != 'educacion'], default=0)
+                if max_other < 2:  # Si otros escenarios son débiles
+                    total_scores['educacion'] += 1
         
         # 6. Retornar el mejor match
         best = max(total_scores.items(), key=lambda x: x[1])
@@ -801,10 +897,11 @@ class ChatBot:
         )
 
     def handle_educacion(self, text: str, dt: datetime) -> str:
-        t = text.lower()
+        # Normalizar para mejor detección
+        t = normalize_text(text)
         
-        # Detectar conceptos específicos
-        if "inflación" in t or "inflacion" in t:
+        # Detectar conceptos específicos (ya normalizados)
+        if "inflacion" in t:
             return (
                 "📚 La inflación es el aumento generalizado de precios.\n\n"
                 "¿Qué significa?\n"
@@ -817,7 +914,7 @@ class ChatBot:
                 "¿Quieres saber sobre inversiones anti-inflación?"
             )
         
-        if "interés" in t or "interes" in t:
+        if "interes" in t:
             return (
                 "📚 Tipos de interés:\n\n"
                 "🟢 Interés Simple:\n"
@@ -831,35 +928,107 @@ class ChatBot:
                 "¿Quieres calcular cuánto crecería tu inversión?"
             )
         
+        if "diversificacion" in t or "diversificar" in t:
+            return (
+                "📚 Diversificación: No pongas todos los huevos en la misma canasta 🥚\n\n"
+                "¿Qué es?\n"
+                "• Repartir tu dinero en diferentes inversiones\n"
+                "• Si una baja, las otras compensan\n\n"
+                "Ejemplo básico:\n"
+                "• 40% Bonos (bajo riesgo)\n"
+                "• 40% Acciones (riesgo medio)\n"
+                "• 20% Cripto/otros (alto riesgo)\n\n"
+                "💡 Nunca dependas de una sola inversión.\n\n"
+                "¿Quieres que te ayude a armar una estrategia diversificada?"
+            )
+        
+        if "oro" in t:
+            return (
+                "📚 El Oro como Inversión 🥇\n\n"
+                "Ventajas:\n"
+                "✅ Refugio en crisis económicas\n"
+                "✅ Protección contra inflación\n"
+                "✅ Valor reconocido mundialmente\n\n"
+                "Desventajas:\n"
+                "❌ No genera intereses ni dividendos\n"
+                "❌ Costos de almacenamiento\n"
+                "❌ Volatilidad a corto plazo\n\n"
+                "Formas de invertir:\n"
+                "• Oro físico (lingotes, monedas)\n"
+                "• ETFs de oro (más líquido)\n"
+                "• Acciones mineras de oro\n\n"
+                "💡 Recomendado: 5-10% de tu portafolio en oro.\n\n"
+                "¿Te interesa saber sobre otras inversiones?"
+            )
+        
+        # Ahorro e inversión (detectar ANTES del menú genérico)
+        if any(word in t for word in ["ahorro", "ahorrar", "sobre ahorro"]):
+            return (
+                "📚 Ahorro vs Inversión: ¿Cuál es la diferencia?\n\n"
+                "🏦 AHORRO:\n"
+                "• Guardar dinero sin riesgo\n"
+                "• Acceso inmediato\n"
+                "• Poco o nulo rendimiento\n"
+                "• Para emergencias y metas corto plazo\n\n"
+                "📈 INVERSIÓN:\n"
+                "• Hacer crecer tu dinero\n"
+                "• Puede tener riesgo\n"
+                "• Mayor rendimiento potencial\n"
+                "• Para metas largo plazo (5+ años)\n\n"
+                "💡 Necesitas AMBOS: Primero ahorra para emergencias, luego invierte.\n\n"
+                "¿Quieres ayuda para empezar a ahorrar o invertir?"
+            )
+        
+        # Tarjetas de crédito
+        if "tarjeta" in t or "credito" in t:
+            return (
+                "📚 Tarjetas de Crédito: Cómo funcionan 💳\n\n"
+                "¿Qué es?\n"
+                "• Préstamo del banco que pagas después\n"
+                "• NO es tu dinero, es deuda\n\n"
+                "⚠️ CUIDADO con:\n"
+                "• Pagar solo el mínimo (intereses altísimos)\n"
+                "• Financiar en cuotas todo\n"
+                "• Sacar adelantos en efectivo\n\n"
+                "✅ Usa bien:\n"
+                "• Paga TODO antes del vencimiento\n"
+                "• Úsala para gastos planificados\n"
+                "• Aprovecha beneficios y puntos\n\n"
+                "💡 Si no podés pagar todo, mejor no la uses.\n\n"
+                "¿Tenés deudas en tarjeta que necesites organizar?"
+            )
+        
+        # Respuesta genérica solo si no matcheó nada
         return (
             "🎓 Centro de Educación Financiera\n\n"
-            "Conceptos que puedo explicarte:\n"
-            "• 💹 Inflación y cómo protegerte\n"
-            "• 💰 Interés simple vs compuesto\n"
-            "• 📊 Diversificación de inversiones\n"
-            "• 💳 Cómo funcionan las tarjetas de crédito\n"
-            "• 🏦 Diferencia entre ahorro e inversión\n\n"
-            "Escribe sobre qué concepto quieres aprender.\n"
-            "O vuelve al menú principal escribiendo 'ayuda'."
+            "Conceptos que puedo explicarte:\n\n"
+            "💹 Inflación - Cómo protegerte\n"
+            "💰 Interés simple vs compuesto\n"
+            "📊 Diversificación de inversiones\n"
+            "🥇 Oro como inversión\n"
+            "💳 Tarjetas de crédito\n"
+            "🏦 Ahorro vs inversión\n\n"
+            "Preguntame sobre cualquiera de estos temas.\n"
+            "Por ejemplo: 'Qué es la inflación' o 'Sobre ahorro'"
         )
 
     def handle_help(self, text: str, dt: datetime) -> str:
         return (
             "¡Hola! Soy tu asistente de educación financiera personal 💰\n\n"
-            "Puedo ayudarte con:\n"
-            "• 📊 Presupuesto: Organiza tus ingresos y gastos\n"
-            "• 🏦 Ahorro: Estrategias y metas personalizadas\n"
-            "• 📈 Inversiones: Guía según tu perfil\n"
-            "• 💳 Deudas: Planes realistas para salir\n"
-            "• 🧮 Calculadora: Simula inversiones, préstamos, etc.\n"
-            "• 🎓 Educación: Aprende conceptos financieros\n\n"
-            "Ejemplos:\n"
-            "- 'Presupuesto con $50000 de ingreso'\n"
-            "- 'Ahorrar $200000 para un auto'\n"
-            "- 'Invertir como principiante'\n"
-            "- 'Tengo deuda de $30000 en tarjeta'\n"
-            "- 'Explicame qué es la inflación'\n\n"
-            "Escribe tu consulta con números y detalles para respuestas más precisas ✨"
+            "¿En qué puedo ayudarte?\n\n"
+            "📊 Presupuesto - Organiza ingresos y gastos\n"
+            "🏦 Ahorro - Metas y estrategias\n"
+            "📈 Inversiones - Guía según tu perfil\n"
+            "💳 Deudas - Planes para salir\n"
+            "🧮 Calculadora - Simuladores financieros\n"
+            "🎓 Educación - Conceptos financieros\n\n"
+            "💬 Ejemplos de lo que puedes decirme:\n"
+            "• 'Presupuesto con $50000'\n"
+            "• 'Quiero ahorrar para un auto'\n"
+            "• 'Invertir mi aguinaldo'\n"
+            "• 'Tengo deuda de $30000'\n"
+            "• 'Qué es la inflación'\n\n"
+            "Escribe tu consulta naturalmente ✨"
         )
 
     def process(self, user_text: str, when: Optional[datetime] = None) -> BotResult:

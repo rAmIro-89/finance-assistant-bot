@@ -440,6 +440,291 @@ def claim_token(token: str):
     return resp
 
 
+@app.get("/logs")
+def view_logs():
+    """Visualiza las interacciones de los usuarios"""
+    import csv
+    from pathlib import Path
+    
+    log_path = Path(__file__).parent / "chat_logs.csv"
+    
+    if not log_path.exists():
+        return "<h1>No hay logs disponibles</h1>"
+    
+    # Leer logs
+    logs = []
+    with open(log_path, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        logs = list(reader)
+    
+    # Invertir para mostrar más recientes primero
+    logs.reverse()
+    
+    # Estadísticas rápidas
+    from collections import Counter
+    total = len(logs)
+    scenarios = Counter(log['scenario'] for log in logs)
+    sentiments = Counter(log['sentiment'] for log in logs)
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Logs de Interacciones</title>
+        <style>
+            * {{ box-sizing: border-box; }}
+            body {{ 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
+                margin: 0; 
+                padding: 20px; 
+                background: #f5f5f5; 
+            }}
+            .container {{ max-width: 1400px; margin: 0 auto; }}
+            h1 {{ color: #333; margin-bottom: 10px; }}
+            .stats {{ 
+                display: grid; 
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+                gap: 15px; 
+                margin: 20px 0; 
+            }}
+            .stat-card {{ 
+                background: white; 
+                padding: 20px; 
+                border-radius: 8px; 
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            }}
+            .stat-value {{ font-size: 32px; font-weight: bold; color: #45B7D1; }}
+            .stat-label {{ color: #666; font-size: 14px; margin-top: 5px; }}
+            .filters {{
+                background: white;
+                padding: 15px;
+                border-radius: 8px;
+                margin: 20px 0;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }}
+            .filters input, .filters select {{
+                padding: 8px;
+                margin: 0 10px 10px 0;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }}
+            table {{ 
+                width: 100%; 
+                background: white; 
+                border-collapse: collapse; 
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                border-radius: 8px;
+                overflow: hidden;
+            }}
+            th {{ 
+                background: #45B7D1; 
+                color: white; 
+                padding: 12px; 
+                text-align: left; 
+                font-weight: 600;
+                position: sticky;
+                top: 0;
+            }}
+            td {{ padding: 12px; border-bottom: 1px solid #eee; }}
+            tr:hover {{ background: #f9f9f9; }}
+            .timestamp {{ color: #666; font-size: 12px; }}
+            .scenario {{ 
+                display: inline-block; 
+                padding: 4px 8px; 
+                border-radius: 4px; 
+                font-size: 11px; 
+                font-weight: 600;
+                text-transform: uppercase;
+            }}
+            .scenario-presupuesto {{ background: #E3F2FD; color: #1976D2; }}
+            .scenario-ahorro {{ background: #E8F5E9; color: #388E3C; }}
+            .scenario-inversiones {{ background: #FFF3E0; color: #F57C00; }}
+            .scenario-deudas {{ background: #FFEBEE; color: #D32F2F; }}
+            .scenario-educacion {{ background: #F3E5F5; color: #7B1FA2; }}
+            .scenario-calculadora {{ background: #E0F2F1; color: #00796B; }}
+            .scenario-ayuda {{ background: #EEEEEE; color: #616161; }}
+            .sentiment {{ 
+                display: inline-block; 
+                padding: 2px 6px; 
+                border-radius: 3px; 
+                font-size: 10px;
+            }}
+            .sentiment-positivo {{ background: #C8E6C9; color: #2E7D32; }}
+            .sentiment-negativo {{ background: #FFCDD2; color: #C62828; }}
+            .sentiment-neutral {{ background: #E0E0E0; color: #616161; }}
+            .user-msg {{ 
+                color: #333; 
+                font-weight: 500;
+                max-width: 400px;
+                word-wrap: break-word;
+            }}
+            .bot-msg {{ 
+                color: #666; 
+                font-size: 13px;
+                max-width: 500px;
+                word-wrap: break-word;
+                max-height: 100px;
+                overflow-y: auto;
+            }}
+            .back-link {{
+                display: inline-block;
+                padding: 10px 20px;
+                background: #4ECDC4;
+                color: white;
+                text-decoration: none;
+                border-radius: 6px;
+                margin-right: 10px;
+            }}
+            .back-link:hover {{ background: #42b8ad; }}
+            .analyze-link {{
+                display: inline-block;
+                padding: 10px 20px;
+                background: #FF6B6B;
+                color: white;
+                text-decoration: none;
+                border-radius: 6px;
+            }}
+            .analyze-link:hover {{ background: #ee5a52; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>📊 Logs de Interacciones del Bot</h1>
+            <p style="color: #666; margin-bottom: 20px;">Total: {total} interacciones registradas</p>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value">{scenarios.get('inversiones', 0)}</div>
+                    <div class="stat-label">📈 Inversiones</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{scenarios.get('presupuesto', 0)}</div>
+                    <div class="stat-label">📊 Presupuestos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{scenarios.get('ahorro', 0)}</div>
+                    <div class="stat-label">🏦 Ahorros</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{scenarios.get('deudas', 0)}</div>
+                    <div class="stat-label">💳 Deudas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{sentiments.get('positivo', 0)}</div>
+                    <div class="stat-label">😊 Positivos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{scenarios.get('ayuda', 0)}</div>
+                    <div class="stat-label">❓ Sin clasificar</div>
+                </div>
+            </div>
+            
+            <div class="filters">
+                <input type="text" id="searchBox" placeholder="🔍 Buscar en mensajes..." style="width: 300px;">
+                <select id="scenarioFilter">
+                    <option value="">Todos los escenarios</option>
+                    <option value="inversiones">Inversiones</option>
+                    <option value="presupuesto">Presupuesto</option>
+                    <option value="ahorro">Ahorro</option>
+                    <option value="deudas">Deudas</option>
+                    <option value="educacion">Educación</option>
+                    <option value="ayuda">Ayuda</option>
+                </select>
+                <select id="sentimentFilter">
+                    <option value="">Todos los sentimientos</option>
+                    <option value="positivo">Positivo</option>
+                    <option value="negativo">Negativo</option>
+                    <option value="neutral">Neutral</option>
+                </select>
+            </div>
+            
+            <div style="margin: 20px 0;">
+                <a href="/" class="back-link">💬 Volver al Chat</a>
+                <a href="/dashboard" class="back-link">📈 Dashboard</a>
+                <a href="#" class="analyze-link" onclick="analyzeErrors(); return false;">🔍 Analizar Errores</a>
+            </div>
+            
+            <table id="logsTable">
+                <thead>
+                    <tr>
+                        <th>Fecha/Hora</th>
+                        <th>Escenario</th>
+                        <th>Sentimiento</th>
+                        <th>Emoción</th>
+                        <th>Mensaje Usuario</th>
+                        <th>Respuesta Bot</th>
+                    </tr>
+                </thead>
+                <tbody>
+    """
+    
+    for log in logs[:200]:  # Limitar a 200 más recientes
+        timestamp = log['timestamp'][:16].replace('T', ' ')
+        scenario = log['scenario']
+        sentiment = log['sentiment']
+        emotion = log['emotion']
+        user_msg = log['user'][:100]
+        bot_msg = log['bot'][:200]
+        
+        html += f"""
+                    <tr data-scenario="{scenario}" data-sentiment="{sentiment}">
+                        <td class="timestamp">{timestamp}</td>
+                        <td><span class="scenario scenario-{scenario}">{scenario}</span></td>
+                        <td><span class="sentiment sentiment-{sentiment}">{sentiment}</span></td>
+                        <td>{emotion}</td>
+                        <td class="user-msg">{user_msg}</td>
+                        <td class="bot-msg">{bot_msg}</td>
+                    </tr>
+        """
+    
+    html += """
+                </tbody>
+            </table>
+        </div>
+        
+        <script>
+            // Filtros en tiempo real
+            const searchBox = document.getElementById('searchBox');
+            const scenarioFilter = document.getElementById('scenarioFilter');
+            const sentimentFilter = document.getElementById('sentimentFilter');
+            const table = document.getElementById('logsTable');
+            const rows = table.querySelectorAll('tbody tr');
+            
+            function filterTable() {
+                const search = searchBox.value.toLowerCase();
+                const scenario = scenarioFilter.value;
+                const sentiment = sentimentFilter.value;
+                
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    const rowScenario = row.dataset.scenario;
+                    const rowSentiment = row.dataset.sentiment;
+                    
+                    const matchSearch = !search || text.includes(search);
+                    const matchScenario = !scenario || rowScenario === scenario;
+                    const matchSentiment = !sentiment || rowSentiment === sentiment;
+                    
+                    row.style.display = (matchSearch && matchScenario && matchSentiment) ? '' : 'none';
+                });
+            }
+            
+            searchBox.addEventListener('input', filterTable);
+            scenarioFilter.addEventListener('change', filterTable);
+            sentimentFilter.addEventListener('change', filterTable);
+            
+            function analyzeErrors() {
+                alert('Ejecuta "python analyze_logs.py" en la terminal para ver un análisis completo de errores.');
+            }
+        </script>
+    </body>
+    </html>
+    """
+    
+    return html
+
+
 if __name__ == "__main__":
     # Ejecuta el servidor accesible desde cualquier interfaz de red
     debug_enabled = os.getenv("FLASK_DEBUG", "0") == "1"
