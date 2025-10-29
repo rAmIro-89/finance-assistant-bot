@@ -34,3 +34,16 @@ chat_logs_backup.csv
 Thumbs.db
 *.bak
 *.tmp
+
+# Documentacion y scripts locales
+ASUSTOR_DEPLOY.md
+COMANDOS_RAPIDOS.txt
+Chatbot24x7_Proyecto.ipynb
+DESPLIEGUE_NAS.md
+ESTRUCTURA_PROYECTO.md
+deploy.sh
+iniciar_ngrok.bat
+prepare-deploy.ps1
+test_conversation.py
+test-docker.ps1
+deploy_to_nas.bat
