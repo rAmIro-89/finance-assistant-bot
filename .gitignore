@@ -24,7 +24,8 @@ dist/
 *.sqlite
 *.sqlite3
 chat_logs.csv
-chat_logs_backup.csv
+chat_logs_backup*.csv
+logs_dashboard.html
 
 # Docker
 .dockerignore
@@ -47,3 +48,5 @@ prepare-deploy.ps1
 test_conversation.py
 test-docker.ps1
 deploy_to_nas.bat
+sync_logs_from_nas.bat
+generate_logs_dashboard.py

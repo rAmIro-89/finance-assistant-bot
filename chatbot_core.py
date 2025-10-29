@@ -35,10 +35,15 @@ def normalize_text(text: str) -> str:
     Normaliza el texto para mejorar la detección:
     - Convierte a minúsculas
     - Elimina acentos y diacríticos
-    - Preserva números y espacios
+    - Convierte _ y - en espacios
+    - Normaliza espacios múltiples
+    - Preserva números
     """
     # Convertir a minúsculas
     text = text.lower()
+    
+    # Convertir underscores y guiones en espacios
+    text = text.replace('_', ' ').replace('-', ' ')
     
     # Eliminar acentos (NFD normaliza y separamos los diacríticos)
     text = unicodedata.normalize('NFD', text)
@@ -266,62 +271,87 @@ class ChatBot:
         # NORMALIZAR el texto primero (sin acentos, minúsculas, etc.)
         t = normalize_text(text)
         
-        # 0. Detección directa de palabras clave sueltas (mejorada con normalización)
+        # 0. MAPEO DIRECTO de keywords prioritarias (máxima prioridad)
+        direct_map = {
+            "inversiones": ["invertir", "inversion", "aguinaldo", "oro", "gold", "plata", "silver", 
+                          "dolar", "dollar", "cripto", "crypto", "bitcoin", "btc", "ethereum", "eth",
+                          "acciones", "accion", "stock", "bolsa", "plazo fijo", "cedear"],
+            "presupuesto": ["presupuesto", "organizar gastos", "distribuir ingresos", "gano", "ingreso"],
+            "ahorro": ["ahorrar", "ahorro"],
+            "deudas": ["deuda", "prestamo", "tarjeta", "credito", "debo", "pagar cuota"],
+            "educacion": ["que es", "como funciona", "explicar", "explicame", "ensenar", "aprender"],
+            "calculadora": ["calculadora", "calcular", "simular"]
+        }
+        
+        # Verificar mapeo directo (sin importar contexto)
+        for scenario, keywords in direct_map.items():
+            for keyword in keywords:
+                if keyword in t:
+                    return scenario
+        
+        # 1. SISTEMA DE MEMORIA CONVERSACIONAL MEJORADO
+        waiting = self.conversation_state.get('waiting_for')
+        partial = self.conversation_state.get('partial_data', {})
+        
+        # 1.1 Detección de METAS DE AHORRO (una palabra)
+        ahorro_metas = {
+            "casa", "vivienda", "departamento", "depto", "hogar",
+            "auto", "carro", "coche", "vehiculo", "moto", "camioneta",
+            "viaje", "vacaciones", "vacacionar", "conocer",
+            "emergencia", "emergencias", "fondo",
+            "boda", "casamiento", "matrimonio",
+            "estudios", "universidad", "maestria", "curso"
+        }
+        
+        # Si es UNA sola palabra Y es meta de ahorro Y venimos de ahorro
+        if len(t.split()) == 1 and t in ahorro_metas:
+            if self.last_scenario == "ahorro" or waiting == "meta_ahorro":
+                return "ahorro"
+        
+        # 1.2 Si es SOLO UN NÚMERO y tenemos contexto previo
+        if re.match(r'^\d+[\d\s.,]*$', t):
+            # Si estamos esperando un número específico
+            if waiting in ["monto", "monto_ahorro", "monto_deuda", "monto_inversion", 
+                          "ingreso_mensual", "pago_mensual", "plazo_meses"]:
+                return self.last_scenario or "ayuda"
+            
+            # Si el escenario anterior usa números, mantenerlo
+            if self.last_scenario in ["presupuesto", "ahorro", "deudas", "inversiones"]:
+                return self.last_scenario
+        
+        # 1.3 Si estamos esperando información específica (respuestas cortas)
+        if waiting:
+            # Patrones de continuación
+            continuation_patterns = [
+                r'^(si|sí|no|dale|ok|bueno|claro|genial|perfecto)$',
+                r'^\d+[\d\s.,]*$',  # Solo números
+            ]
+            
+            if any(re.match(pattern, t, re.IGNORECASE) for pattern in continuation_patterns):
+                return self.last_scenario or "ayuda"
+            
+            # Cualquier respuesta corta (<=3 palabras) mantiene contexto
+            if len(t.split()) <= 3:
+                return self.last_scenario or "ayuda"
+        
+        # 1.4 Detección de palabras clave sueltas (1-2 palabras)
         if len(t.split()) <= 2:
             single_word_map = {
-                # Todas normalizadas (sin acentos)
-                "presupuesto": "presupuesto",
-                "presupuestos": "presupuesto",
-                "ahorro": "ahorro",
-                "ahorrar": "ahorro",
-                "ahorros": "ahorro",
-                "inversion": "inversiones",
-                "inversiones": "inversiones",
-                "invertir": "inversiones",
-                "deuda": "deudas",
-                "deudas": "deudas",
-                "prestamo": "deudas",
-                "tarjeta": "deudas",
-                "educacion": "educacion",
-                "aprender": "educacion",
-                "calculadora": "calculadora",
-                "calcular": "calculadora",
+                "presupuesto": "presupuesto", "presupuestos": "presupuesto",
+                "ahorro": "ahorro", "ahorrar": "ahorro", "ahorros": "ahorro",
+                "inversion": "inversiones", "inversiones": "inversiones",
+                "deuda": "deudas", "deudas": "deudas",
+                "educacion": "educacion", "aprender": "educacion",
+                "calculadora": "calculadora", "calcular": "calculadora",
             }
             for word in t.split():
                 if word in single_word_map:
                     return single_word_map[word]
         
-        # 1. Si estamos esperando información específica (respuestas cortas)
-        if self.conversation_state['waiting_for']:
-            # Si el usuario solo pone un número o respuesta breve, mantener el contexto
-            if len(t.split()) <= 3 or re.match(r'^\d+[\d\s.,]*$', t):
-                return self.last_scenario or "ayuda"
-        
-        # 2. Detección de respuestas muy cortas con contexto
+        # 1.5 Respuestas de continuación
         if len(t.split()) <= 2:
-            # Si solo es un número, mantener el escenario anterior
-            if re.match(r'^\d+[\d\s.,]*$', t) and self.last_scenario:
-                return self.last_scenario
-            
-            # Respuestas de continuación
-            follow_up = ["sí", "si", "dale", "ok", "bueno", "claro", "genial", "perfecto"]
+            follow_up = ["si", "sí", "no", "dale", "ok", "bueno", "claro", "genial", "perfecto"]
             if any(word in t for word in follow_up) and self.last_scenario:
-                return self.last_scenario
-            
-            # Palabras clave de ahorro (una sola palabra)
-            ahorro_keywords = ["casa", "auto", "carro", "viaje", "vacaciones", "emergencia", 
-                             "vivienda", "departamento", "vehiculo"]
-            if any(word in t for word in ahorro_keywords):
-                return "ahorro"
-            
-            # Respuestas de afirmación con tema anterior
-            if self.conversation_state['last_topic']:
-                # Si menciona el tema anterior brevemente
-                if self.conversation_state['last_topic'].lower() in t:
-                    return self.last_scenario or "ayuda"
-            
-            # Si tenemos un escenario previo y es respuesta corta, mantenerlo
-            if self.last_scenario:
                 return self.last_scenario
         
         # 3. Remover palabras vacías (stop words) para mejor detección
@@ -446,39 +476,60 @@ class ChatBot:
 
 
     def handle_ahorro(self, text: str, dt: datetime) -> str:
-        # Detectar metas específicas
+        t = text.lower()
+        
+        # Detectar metas específicas (mejorado con más keywords)
+        metas_map = {
+            "🏠 Vivienda": ["casa", "vivienda", "departamento", "depto", "hogar", "propiedad"],
+            "🚗 Auto": ["auto", "carro", "coche", "vehiculo", "vehículo", "moto", "camioneta"],
+            "✈️ Viaje/Vacaciones": ["viaje", "viajar", "vacaciones", "vacacionar", "conocer", "turismo"],
+            "🆘 Fondo emergencia": ["emergencia", "emergencias", "imprevisto", "fondo"],
+            "💍 Boda": ["boda", "casamiento", "matrimonio"],
+            "🎓 Estudios": ["estudios", "universidad", "maestria", "curso", "carrera"]
+        }
+        
         metas_detectadas = []
-        if any(w in text.lower() for w in ["auto", "carro", "vehiculo"]):
-            metas_detectadas.append("🚗 Auto")
-        if any(w in text.lower() for w in ["casa", "vivienda", "departamento"]):
-            metas_detectadas.append("🏠 Vivienda")
-        if any(w in text.lower() for w in ["viaje", "viajar", "vacaciones"]):
-            metas_detectadas.append("✈️ Viaje")
-        if any(w in text.lower() for w in ["emergencia", "imprevisto"]):
-            metas_detectadas.append("🆘 Fondo de emergencia")
+        for meta, keywords in metas_map.items():
+            if any(w in t for w in keywords):
+                metas_detectadas.append(meta)
+                break  # Solo tomar la primera meta detectada
         
         # Extraer monto objetivo si existe
         m = re.search(r"\$?\s*(\d+(?:[.,]\d{3})*(?:[.,]\d{2})?)", text)
         
+        # CASO 1: Detectamos META en el mensaje
         if metas_detectadas:
-            meta_str = " y ".join(metas_detectadas)
+            meta_str = metas_detectadas[0]
             # Guardar la meta en el contexto
-            self.conversation_state['last_topic'] = metas_detectadas[0]
+            self.conversation_state['last_topic'] = meta_str
+            self.conversation_state['partial_data']['meta'] = meta_str
             
             respuesta = f"¡Excelente meta: {meta_str}! 🎯\n\n"
             
+            # CASO 1A: Tenemos META + MONTO
             if m:
                 monto_str = m.group(1).replace(",", "")
                 objetivo = float(monto_str.replace(".", ""))
-                self.conversation_state['waiting_for'] = None
-                self.conversation_state['partial_data'] = {}
+                self.user_data['objetivo_ahorro'] = objetivo
+                
+                # Persistir meta de ahorro
+                try:
+                    update_user_fields(getattr(self, 'user_phone', 'web_user'), 
+                                     savings_goal=objetivo, 
+                                     savings_purpose=meta_str)
+                except Exception:
+                    pass
                 
                 # Calcular tiempos de ahorro
                 mes_10 = objetivo / 10
                 mes_15 = objetivo / 15
                 mes_20 = objetivo / 20
                 
-                respuesta += (
+                self.conversation_state['waiting_for'] = 'ahorro_plazo'
+                self.conversation_state['partial_data']['monto'] = objetivo
+                
+                return (
+                    respuesta +
                     f"Para ahorrar ${objetivo:,.0f}:\n\n"
                     f"📅 En 10 meses: ahorra ${mes_10:,.0f}/mes\n"
                     f"📅 En 15 meses: ahorra ${mes_15:,.0f}/mes\n"
@@ -486,25 +537,34 @@ class ChatBot:
                     f"💡 Tip: Automatiza una transferencia el día que cobras.\n"
                     f"¿En cuánto tiempo quieres lograrlo?"
                 )
-            else:
-                # Guardamos la meta pero falta el monto
-                self.conversation_state['waiting_for'] = 'ahorro_monto'
-                self.conversation_state['partial_data']['meta'] = meta_str
-                respuesta += f"¿Cuánto necesitas ahorrar para {meta_str}?"
             
-            return respuesta
+            # CASO 1B: Solo tenemos META (falta monto)
+            else:
+                self.conversation_state['waiting_for'] = 'ahorro_monto'
+                return respuesta + f"¿Cuánto necesitas ahorrar para {meta_str}?"
         
-        # Si no detectamos meta, verificar si tenemos contexto previo
-        if self.conversation_state['waiting_for'] == 'ahorro_monto' and m:
+        # CASO 2: NO hay meta pero SÍ hay MONTO (y estábamos esperando monto)
+        if m and self.conversation_state.get('waiting_for') == 'ahorro_monto':
             monto_str = m.group(1).replace(",", "")
             objetivo = float(monto_str.replace(".", ""))
             meta_str = self.conversation_state['partial_data'].get('meta', 'tu meta')
-            self.conversation_state['waiting_for'] = None
-            self.conversation_state['partial_data'] = {}
+            self.user_data['objetivo_ahorro'] = objetivo
             
+            # Persistir
+            try:
+                update_user_fields(getattr(self, 'user_phone', 'web_user'), 
+                                 savings_goal=objetivo,
+                                 savings_purpose=meta_str)
+            except Exception:
+                pass
+            
+            # Calcular planes
             mes_10 = objetivo / 10
             mes_15 = objetivo / 15
             mes_20 = objetivo / 20
+            
+            self.conversation_state['waiting_for'] = 'ahorro_plazo'
+            self.conversation_state['partial_data']['monto'] = objetivo
             
             return (
                 f"Perfecto! Para ahorrar ${objetivo:,.0f} para {meta_str}:\n\n"
@@ -515,6 +575,43 @@ class ChatBot:
                 f"¿En cuánto tiempo quieres lograrlo?"
             )
         
+        # CASO 3: Tenemos PLAZO (después de tener meta + monto)
+        if self.conversation_state.get('waiting_for') == 'ahorro_plazo':
+            # Extraer meses del texto
+            meses = None
+            if "mes" in t:
+                m_meses = re.search(r"(\d+)\s*mes", t)
+                if m_meses:
+                    meses = int(m_meses.group(1))
+            elif "año" in t or "anio" in t:
+                m_años = re.search(r"(\d+)\s*a[ñn]o", t)
+                if m_años:
+                    meses = int(m_años.group(1)) * 12
+            elif m:  # Solo un número, asumimos meses
+                meses = int(float(m.group(1)))
+            
+            if meses:
+                objetivo = self.conversation_state['partial_data'].get('monto', 0)
+                meta_str = self.conversation_state['partial_data'].get('meta', 'tu meta')
+                ahorro_mensual = objetivo / meses if meses > 0 else 0
+                
+                self.conversation_state['waiting_for'] = None
+                self.conversation_state['partial_data'] = {}
+                
+                return (
+                    f"¡Perfecto! Plan de ahorro para {meta_str}:\n\n"
+                    f"🎯 Meta: ${objetivo:,.0f}\n"
+                    f"📅 Plazo: {meses} meses\n"
+                    f"💰 Ahorro mensual: ${ahorro_mensual:,.0f}\n\n"
+                    f"✅ Consejos para lograrlo:\n"
+                    f"• Automatiza la transferencia el día que cobras\n"
+                    f"• Crea una cuenta separada solo para esto\n"
+                    f"• Considera invertir el dinero (FCI, plazo fijo)\n"
+                    f"• Revisa tu progreso mensualmente\n\n"
+                    f"💡 Si ahorras ${ahorro_mensual:,.0f}/mes, en {meses} meses tendrás ${objetivo:,.0f}!"
+                )
+        
+        # CASO 4: Mensaje inicial genérico
         consejos = [
             "Automatiza tu ahorro: Programa transferencias automáticas el día que cobras.",
             "Método de los sobres: Divide tu dinero en sobres por categoría.",
@@ -522,6 +619,8 @@ class ChatBot:
             "Challenge 52 semanas: Semana 1 ahorra $100, semana 2 $200, y así..."
         ]
         consejo = random.choice(consejos)
+        
+        self.conversation_state['waiting_for'] = 'meta_ahorro'
         
         return (
             f"¡Genial que quieras ahorrar! 🏦\n\n"
@@ -536,6 +635,181 @@ class ChatBot:
 
     def handle_inversiones(self, text: str, dt: datetime) -> str:
         t = text.lower()
+        
+        # DETECTAR ACTIVOS ESPECÍFICOS PRIMERO (respuestas especializadas)
+        activo_oro = any(w in t for w in ["oro", "gold"])
+        activo_plata = any(w in t for w in ["plata", "silver"])
+        activo_dolar = any(w in t for w in ["dólar", "dolar", "dollar", "divisa", "moneda extranjera"])
+        activo_cripto = any(w in t for w in ["crypto", "cripto", "bitcoin", "btc", "ethereum", "eth", "criptomoneda"])
+        activo_acciones = any(w in t for w in ["accion", "acción", "acciones", "stock", "bolsa", "cedear"])
+        activo_plazo = any(w in t for w in ["plazo fijo", "plazo", "fijo"])
+        
+        # RESPUESTAS ESPECÍFICAS POR ACTIVO
+        if activo_oro:
+            return (
+                "🟡 **ORO como inversión**\n\n"
+                "✅ **Ventajas:**\n"
+                "• Refugio de valor en crisis económicas\n"
+                "• Protección contra inflación y devaluación\n"
+                "• Liquidez global (se vende en cualquier lado)\n"
+                "• Diversificación de portafolio\n\n"
+                "❌ **Desventajas:**\n"
+                "• No genera rendimiento (dividendos/intereses)\n"
+                "• Costos de almacenamiento si es físico\n"
+                "• Puede ser volátil a corto plazo\n\n"
+                "💰 **Formas de invertir:**\n"
+                "1. **ETFs/CEDEARs de oro** (GLD, IAU) - Lo más práctico\n"
+                "2. **Oro físico** (lingotes, monedas) - Control total pero caro\n"
+                "3. **Acciones de mineras** - Mayor riesgo pero potencial de ganancia\n\n"
+                "📊 **Recomendación:**\n"
+                "• 5-10% del portafolio en oro como protección\n"
+                "• Mejor en ETFs que físico (más líquido y seguro)\n"
+                "• Complementa con plata, dólar y otros activos\n\n"
+                "¿Querés más info sobre cómo comprar ETFs de oro o sobre otros activos?"
+            )
+        
+        if activo_plata:
+            return (
+                "⚪ **PLATA como inversión**\n\n"
+                "✅ **Ventajas:**\n"
+                "• Similar al oro pero más accesible\n"
+                "• Uso industrial (electrónica, solar) = demanda real\n"
+                "• Históricamente sube más que oro en bull markets\n\n"
+                "❌ **Desventajas:**\n"
+                "• MÁS volátil que el oro\n"
+                "• Menos líquida\n"
+                "• Ocupan más espacio si es físico\n\n"
+                "💰 **Formas de invertir:**\n"
+                "1. **ETFs de plata** (SLV, PSLV)\n"
+                "2. **Plata física** (monedas, lingotes pequeños)\n"
+                "3. **Ratio oro/plata** - Históricamente 60:1\n\n"
+                "📊 **Recomendación:**\n"
+                "• 3-5% del portafolio\n"
+                "• Cuando ratio oro/plata > 80, la plata está barata\n"
+                "• Más especulativa que oro\n\n"
+                "¿Querés info sobre dólar, cripto u otros activos?"
+            )
+        
+        if activo_dolar:
+            return (
+                "💵 **DÓLAR como inversión**\n\n"
+                "✅ **Ventajas:**\n"
+                "• Protección contra devaluación del peso\n"
+                "• Moneda de reserva mundial\n"
+                "• Alta liquidez\n\n"
+                "❌ **Desventajas:**\n"
+                "• Pierde valor con inflación de USA (~2-3% anual)\n"
+                "• No genera rendimiento si está \"bajo el colchón\"\n"
+                "• Riesgo de confiscación/restricciones (corralito)\n\n"
+                "💰 **Alternativas que SÍ rinden:**\n"
+                "1. **Plazo fijo en USD** - 1-3% anual\n"
+                "2. **Bonos USA** (Treasury) - 4-5% anual, muy seguro\n"
+                "3. **Stablecoins** (USDT, USDC) - 5-10% en DeFi\n"
+                "4. **Dólar MEP/CCL** - Compra legal en Argentina\n\n"
+                "📊 **Recomendación:**\n"
+                "• Tener 20-30% del patrimonio en dólares\n"
+                "• NO dejarlos ociosos: invertir en bonos o plazo fijo USD\n"
+                "• Diversificar: físico + digital + bonos\n\n"
+                "💡 **Mejor opción hoy:** Dólar MEP → Bonos Treasury en USD\n\n"
+                "¿Querés que te explique cómo comprar bonos en dólares?"
+            )
+        
+        if activo_cripto:
+            return (
+                "₿ **CRIPTOMONEDAS como inversión**\n\n"
+                "⚠️ **ADVERTENCIA: Alto riesgo, alta volatilidad**\n\n"
+                "✅ **Ventajas:**\n"
+                "• Potencial de crecimiento exponencial\n"
+                "• Descentralización (no controlado por gobiernos)\n"
+                "• Liquidez 24/7\n"
+                "• Protección contra inflación (Bitcoin: supply limitado)\n\n"
+                "❌ **Desventajas:**\n"
+                "• Puede caer 50-80% en meses\n"
+                "• Riesgo de hackeo si no guardas bien\n"
+                "• Regulación incierta\n"
+                "• Muy técnico para principiantes\n\n"
+                "💰 **Principales criptos:**\n"
+                "1. **Bitcoin (BTC)** - \"Oro digital\", la más segura\n"
+                "2. **Ethereum (ETH)** - Plataforma de contratos inteligentes\n"
+                "3. **Stablecoins** (USDT, USDC) - Dólar digital\n"
+                "4. Resto: MUCHO más riesgo\n\n"
+                "📊 **Recomendación:**\n"
+                "• Solo invierte lo que estés dispuesto a PERDER\n"
+                "• Máximo 5-10% del portafolio\n"
+                "• 70% BTC + 30% ETH (si sos principiante)\n"
+                "• Nunca dejar en exchanges, usar wallet propia\n\n"
+                "🔐 **5 Reglas de Oro:**\n"
+                "1. DCA (Dollar Cost Averaging): compra de a poco\n"
+                "2. HODL: no vendas en pánico\n"
+                "3. Wallet propia (Ledger, Trezor)\n"
+                "4. Nunca compartas tu seed phrase\n"
+                "5. Diversifica: BTC + ETH + stablecoins\n\n"
+                "¿Querés que te explique cómo empezar con poco monto?"
+            )
+        
+        if activo_acciones:
+            return (
+                "📈 **ACCIONES como inversión**\n\n"
+                "✅ **Ventajas:**\n"
+                "• Potencial de crecimiento a largo plazo\n"
+                "• Participación en empresas exitosas\n"
+                "• Dividendos (ingresos pasivos)\n"
+                "• Protección contra inflación\n\n"
+                "❌ **Desventajas:**\n"
+                "• Volatilidad alta\n"
+                "• Requiere conocimiento y análisis\n"
+                "• Riesgo de pérdida de capital\n\n"
+                "💰 **Opciones en Argentina:**\n"
+                "1. **Acciones argentinas** (YPF, GGAL, PAMP)\n"
+                "   • Muy volátil por riesgo país\n"
+                "   • Dividendos en pesos\n\n"
+                "2. **CEDEARs** (Apple, Tesla, Amazon)\n"
+                "   • Acceso a empresas extranjeras\n"
+                "   • En pesos pero siguen al dólar\n"
+                "   • Liquidez en Argentina\n\n"
+                "3. **ETFs globales** (S&P 500, Nasdaq)\n"
+                "   • Diversificación automática (500 empresas)\n"
+                "   • Menor riesgo que acciones individuales\n"
+                "   • Recomendado para principiantes\n\n"
+                "📊 **Recomendación:**\n"
+                "• Principiantes: ETF S&P 500 (SPY, VOO)\n"
+                "• Intermedio: 70% ETF + 30% acciones individuales\n"
+                "• Avanzado: Stock picking + análisis fundamental\n\n"
+                "💡 **Portfolio balanceado:**\n"
+                "• 50% ETFs globales\n"
+                "• 30% CEDEARs (empresas conocidas)\n"
+                "• 20% Bonos/Plazo fijo (colchón)\n\n"
+                "¿Querés que te explique cómo abrir cuenta en broker y empezar?"
+            )
+        
+        if activo_plazo:
+            return (
+                "🏦 **PLAZO FIJO como inversión**\n\n"
+                "✅ **Ventajas:**\n"
+                "• 100% seguro (garantía estatal hasta $30M)\n"
+                "• Predecible (sabes cuánto vas a ganar)\n"
+                "• Fácil de hacer (cualquier banco)\n"
+                "• No requiere conocimiento financiero\n\n"
+                "❌ **Desventajas:**\n"
+                "• Rendimiento bajo (apenas le gana a inflación)\n"
+                "• Dinero bloqueado (penalización si sacas antes)\n"
+                "• En pesos: pierdes si hay devaluación fuerte\n"
+                "• Costo de oportunidad (otras inversiones rinden más)\n\n"
+                "📊 **Tasas actuales (aprox):**\n"
+                "• Plazo fijo tradicional: 40-50% TNA (~35% después de impuestos)\n"
+                "• Plazo fijo UVA: inflación + 1% (protege contra inflación)\n"
+                "• Plazo fijo en USD: 1-3% anual\n\n"
+                "💡 **Mejores alternativas:**\n"
+                "1. **FCI Money Market** - Misma seguridad, liquidez diaria\n"
+                "2. **Bonos CER** - Ajusta por inflación, más líquido\n"
+                "3. **Letras del Tesoro** - Mayor rendimiento, similar seguridad\n"
+                "4. **Plazo fijo UVA** - Si querés plazo fijo, que ajuste por inflación\n\n"
+                "📊 **Recomendación:**\n"
+                "• Plazo fijo: solo para fondo emergencia (liquidez inmediata)\n"
+                "• Mejor opción: 50% FCI + 30% Bonos CER + 20% Plazo fijo\n"
+                "• Si vas a plazo fijo, elegir UVA (mín 90 días)\n\n"
+                "¿Querés que te explique cómo invertir en fondos o bonos?"
+            )
 
         # Detectar nivel de experiencia
         principiante = any(w in t for w in ["principiante", "comienzo", "empezar", "nuevo", "nunca invertí", "primera vez"])
