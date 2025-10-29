@@ -1,0 +1,40 @@
+# Configuración de Ngrok para NAS (alternativa a puerto público)
+# Si no quieres exponer tu IP o configurar puerto forwarding
+
+# Opción 1: Ngrok como contenedor Docker junto al bot
+version: '3.8'
+
+services:
+  chatbot:
+    build: .
+    container_name: chatbot-financiero
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+      - ./chat_logs_backup.csv:/app/chat_logs_backup.csv
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok-tunnel
+    command:
+      - "http"
+      - "chatbot:5000"
+    environment:
+      # Obtén tu token en: https://dashboard.ngrok.com/get-started/your-authtoken
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    ports:
+      - "4040:4040"  # Dashboard de ngrok
+    depends_on:
+      - chatbot
+    restart: unless-stopped
+
+# Uso:
+# 1. Crea archivo .env con: NGROK_AUTHTOKEN=tu_token_aqui
+# 2. Ejecuta: docker-compose -f docker-compose-with-ngrok.yml up -d
+# 3. Obtén URL en: http://IP_NAS:4040
+# 4. Configura esa URL en Twilio webhook

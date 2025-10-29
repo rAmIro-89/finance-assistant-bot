@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chatbot 24/7</title>
+  <style>
+    :root { --bg: #0e1117; --panel: #161b22; --text: #e6edf3; --muted: #a5adba; --accent: #2f81f7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+    header { padding: 10px 12px; background: var(--panel); border-bottom: 1px solid #21262d; flex-shrink: 0; }
+    .header-content { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .header-title { font-size: 16px; font-weight: 600; white-space: nowrap; }
+    .header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .container { flex: 1; display: flex; flex-direction: column; padding: 12px; max-width: 900px; width: 100%; margin: 0 auto; overflow: hidden; }
+    .chat { display: flex; flex-direction: column; gap: 12px; flex: 1; overflow-y: auto; background: #0c0f14; border: 1px solid #21262d; border-radius: 8px; padding: 12px; -webkit-overflow-scrolling: touch; }
+    .msg { max-width: 85%; padding: 10px 12px; border-radius: 12px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; font-size: 15px; }
+    .user { align-self: flex-end; background: #1f6feb; color: white; border-radius: 12px 12px 2px 12px; }
+    .bot { align-self: flex-start; background: #151b23; border: 1px solid #263040; border-radius: 12px 12px 12px 2px; }
+    .meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .input { display: flex; gap: 8px; margin-top: 12px; flex-shrink: 0; }
+    input[type="text"] { flex: 1; padding: 12px; background: var(--panel); color: var(--text); border: 1px solid #30363d; border-radius: 8px; font-size: 16px; }
+    input[type="text"]:focus { outline: none; border-color: var(--accent); }
+    button { padding: 12px 16px; background: var(--accent); color: white; border: 0; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 15px; white-space: nowrap; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    button:active { transform: scale(0.98); }
+    .fine { font-size: 11px; color: var(--muted); margin-top: 8px; text-align: center; }
+    .btn-small { padding: 6px 10px; font-size: 13px; }
+    .dashboard-link { padding: 8px 12px; background: #4ECDC4; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; white-space: nowrap; display: inline-block; }
+
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      body { height: 100dvh; } /* Dynamic viewport height for mobile browsers */
+      header { padding: 8px 10px; }
+      .header-title { font-size: 14px; }
+      .header-actions { font-size: 12px; }
+      .container { padding: 8px; }
+      .chat { padding: 10px; gap: 10px; }
+      .msg { font-size: 14px; max-width: 90%; padding: 9px 11px; }
+      .meta { font-size: 10px; }
+      input[type="text"] { padding: 10px 12px; font-size: 16px; /* Prevents zoom on iOS */ }
+      button { padding: 10px 14px; font-size: 14px; }
+      .btn-small { padding: 5px 8px; font-size: 12px; }
+      .dashboard-link { padding: 6px 10px; font-size: 12px; }
+      .fine { font-size: 10px; margin-top: 6px; display: none; } /* Hide hint on mobile */
+      #whoami { display: none; } /* Hide session info on small screens */
+    }
+
+    @media (max-width: 480px) {
+      .header-title { font-size: 13px; }
+      .msg { max-width: 95%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <strong class="header-title">💰 Asistente Financiero 24/7</strong>
+      <div class="header-actions">
+        <span id="whoami" class="fine"></span>
+        <button id="btn-login" class="btn-small">Iniciar sesión</button>
+        <button id="btn-logout" class="btn-small" style="display:none;">Salir</button>
+        <a href="/dashboard" class="dashboard-link">
+          📊 Dashboard
+        </a>
+      </div>
+    </div>
+  </header>
+  <div class="container">
+    <div id="chat" class="chat" aria-live="polite" aria-label="Historial de chat"></div>
+    <div class="input">
+      <input id="msg" type="text" placeholder="Escribe tu mensaje… (ej.: Quiero un turno el 25/10 a las 15)" />
+      <button id="send">Enviar</button>
+    </div>
+    <div class="fine">Consejo: puedes forzar una hora simulada enviando el campo opcional "when" en el cuerpo (formato HH:MM).</div>
+  </div>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const inputEl = document.getElementById('msg');
+    const sendBtn = document.getElementById('send');
+    const whoamiEl = document.getElementById('whoami');
+    const btnLogin = document.getElementById('btn-login');
+    const btnLogout = document.getElementById('btn-logout');
+
+    function addMessage(role, text, meta) {
+      const wrap = document.createElement('div');
+      wrap.className = 'wrap';
+
+      if (meta) {
+        const metaEl = document.createElement('div');
+        metaEl.className = 'meta';
+        metaEl.textContent = meta;
+        wrap.appendChild(metaEl);
+      }
+
+      const msg = document.createElement('div');
+      msg.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+      msg.textContent = text;
+      wrap.appendChild(msg);
+
+      chatEl.appendChild(wrap);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    async function send() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+      inputEl.value = '';
+      addMessage('user', text);
+      sendBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error HTTP');
+        const meta = `${new Date(data.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} · ${data.period} · ${data.scenario}`;
+        addMessage('bot', data.reply, meta);
+      } catch (err) {
+        addMessage('bot', 'Hubo un problema: ' + err.message);
+      } finally {
+        sendBtn.disabled = false;
+        inputEl.focus();
+      }
+    }
+
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') send();
+    });
+    sendBtn.addEventListener('click', send);
+
+    // Mensaje inicial de bienvenida (solo una vez)
+    let welcomed = false;
+    function showWelcome() {
+      if (!welcomed) {
+        addMessage('bot', 
+          'Hola, soy tu asistente de educación financiera personal 💰\n\n' +
+          'Puedo ayudarte con:\n\n' +
+          '📊 Presupuesto: Organiza tus ingresos y gastos\n' +
+          '💰 Ahorro: Estrategias y metas personalizadas\n' +
+          '📈 Inversiones: Guía según tu perfil de riesgo\n' +
+          '💳 Deudas: Planes realistas para salir\n' +
+          '🧮 Calculadora: Simula inversiones, préstamos, etc.\n' +
+          '📚 Educación: Aprende conceptos financieros\n\n' +
+          'Escribe tu consulta con números y detalles para respuestas más precisas ✨'
+        );
+        welcomed = true;
+      }
+    }
+    showWelcome();
+
+    async function refreshUser() {
+      try {
+        const r = await fetch('/api/user');
+        const u = await r.json();
+        if (u && u.exists) {
+          whoamiEl.textContent = `Sesión: ${u.name ? u.name + ' · ' : ''}${u.phone}`;
+          btnLogin.style.display = 'none';
+          btnLogout.style.display = '';
+        } else {
+          whoamiEl.textContent = 'Sesión: invitado';
+          btnLogin.style.display = '';
+          btnLogout.style.display = 'none';
+        }
+      } catch (e) {
+        whoamiEl.textContent = 'Sesión: invitado';
+        btnLogin.style.display = '';
+        btnLogout.style.display = 'none';
+      }
+    }
+
+    async function loginFlow() {
+      const choice = prompt('Escribe "dni" para usar tu DNI o "nick" para usar un nickname');
+      if (!choice) return;
+      if (choice.toLowerCase().startsWith('dni')) {
+        const dni = prompt('Ingresa tu DNI (solo números):');
+        if (!dni) return;
+        const name = prompt('Nombre (opcional):');
+        await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dni, name }) });
+      } else {
+        const nickname = prompt('Ingresa tu nickname:');
+        if (!nickname) return;
+        const name = prompt('Nombre (opcional):');
+        await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nickname, name }) });
+      }
+      await refreshUser();
+    }
+
+    async function logoutFlow() {
+      await fetch('/api/logout', { method:'POST' });
+      await refreshUser();
+    }
+
+    btnLogin.addEventListener('click', loginFlow);
+    btnLogout.addEventListener('click', logoutFlow);
+    refreshUser();
+  </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Datos sensibles y archivos locales
+.env
+*.db
+*.sqlite
+*.sqlite3
+chat_logs.csv
+chat_logs_backup.csv
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
