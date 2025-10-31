@@ -268,73 +268,47 @@ class ChatBot:
         return sentiment, emotion
 
     def detect(self, text: str) -> str:
-        # NORMALIZAR el texto primero (sin acentos, minúsculas, etc.)
         t = normalize_text(text)
-        
-        # 0. MAPEO DIRECTO de keywords prioritarias (máxima prioridad)
+
+        # MAPEO DIRECTO de keywords prioritarias
         direct_map = {
-            "inversiones": ["invertir", "inversion", "aguinaldo", "oro", "gold", "plata", "silver", 
-                          "dolar", "dollar", "cripto", "crypto", "bitcoin", "btc", "ethereum", "eth",
-                          "acciones", "accion", "stock", "bolsa", "plazo fijo", "cedear"],
+            "inversiones": ["invertir", "inversion", "aguinaldo", "oro", "gold", "plata", "silver", "dolar", "dollar", "cripto", "crypto", "bitcoin", "btc", "ethereum", "eth", "acciones", "accion", "stock", "bolsa", "plazo fijo", "cedear"],
             "presupuesto": ["presupuesto", "organizar gastos", "distribuir ingresos", "gano", "ingreso"],
             "ahorro": ["ahorrar", "ahorro"],
             "deudas": ["deuda", "prestamo", "tarjeta", "credito", "debo", "pagar cuota"],
             "educacion": ["que es", "como funciona", "explicar", "explicame", "ensenar", "aprender"],
             "calculadora": ["calculadora", "calcular", "simular"]
         }
-        
-        # Verificar mapeo directo (sin importar contexto)
         for scenario, keywords in direct_map.items():
             for keyword in keywords:
                 if keyword in t:
                     return scenario
-        
-        # 1. SISTEMA DE MEMORIA CONVERSACIONAL MEJORADO
+
         waiting = self.conversation_state.get('waiting_for')
         partial = self.conversation_state.get('partial_data', {})
-        
-        # 1.1 Detección de METAS DE AHORRO (una palabra)
-        ahorro_metas = {
-            "casa", "vivienda", "departamento", "depto", "hogar",
-            "auto", "carro", "coche", "vehiculo", "moto", "camioneta",
-            "viaje", "vacaciones", "vacacionar", "conocer",
-            "emergencia", "emergencias", "fondo",
-            "boda", "casamiento", "matrimonio",
-            "estudios", "universidad", "maestria", "curso"
-        }
-        
-        # Si es UNA sola palabra Y es meta de ahorro Y venimos de ahorro
-        if len(t.split()) == 1 and t in ahorro_metas:
-            if self.last_scenario == "ahorro" or waiting == "meta_ahorro":
-                return "ahorro"
-        
-        # 1.2 Si es SOLO UN NÚMERO y tenemos contexto previo
+        last = self.last_scenario
+
+        # Mejor manejo de respuestas cortas y números sueltos
+        short_confirm = ["si", "sí", "no", "dale", "ok", "bueno", "claro", "genial", "perfecto"]
+        # Si la respuesta es muy corta y hay contexto fuerte, mantener escenario anterior
+        if len(t.split()) <= 3:
+            if waiting or last in ["presupuesto", "ahorro", "deudas", "inversiones"]:
+                return last or "ayuda"
+            if any(word in t for word in short_confirm):
+                return last or "ayuda"
+
+        # Si es solo un número y hay contexto previo
         if re.match(r'^\d+[\d\s.,]*$', t):
-            # Si estamos esperando un número específico
-            if waiting in ["monto", "monto_ahorro", "monto_deuda", "monto_inversion", 
-                          "ingreso_mensual", "pago_mensual", "plazo_meses"]:
-                return self.last_scenario or "ayuda"
-            
-            # Si el escenario anterior usa números, mantenerlo
-            if self.last_scenario in ["presupuesto", "ahorro", "deudas", "inversiones"]:
-                return self.last_scenario
-        
-        # 1.3 Si estamos esperando información específica (respuestas cortas)
-        if waiting:
-            # Patrones de continuación
-            continuation_patterns = [
-                r'^(si|sí|no|dale|ok|bueno|claro|genial|perfecto)$',
-                r'^\d+[\d\s.,]*$',  # Solo números
-            ]
-            
-            if any(re.match(pattern, t, re.IGNORECASE) for pattern in continuation_patterns):
-                return self.last_scenario or "ayuda"
-            
-            # Cualquier respuesta corta (<=3 palabras) mantiene contexto
-            if len(t.split()) <= 3:
-                return self.last_scenario or "ayuda"
-        
-        # 1.4 Detección de palabras clave sueltas (1-2 palabras)
+            if waiting or last in ["presupuesto", "ahorro", "deudas", "inversiones"]:
+                return last or "ayuda"
+
+        # Detección de metas de ahorro (una palabra)
+        ahorro_metas = {"casa", "vivienda", "departamento", "depto", "hogar", "auto", "carro", "coche", "vehiculo", "moto", "camioneta", "viaje", "vacaciones", "vacacionar", "conocer", "emergencia", "emergencias", "fondo", "boda", "casamiento", "matrimonio", "estudios", "universidad", "maestria", "curso"}
+        if len(t.split()) == 1 and t in ahorro_metas:
+            if last in ["ahorro", "presupuesto", "deudas", "inversiones"] or waiting == "meta_ahorro":
+                return "ahorro"
+
+        # Detección de palabras clave sueltas (1-2 palabras)
         if len(t.split()) <= 2:
             single_word_map = {
                 "presupuesto": "presupuesto", "presupuestos": "presupuesto",
@@ -347,92 +321,67 @@ class ChatBot:
             for word in t.split():
                 if word in single_word_map:
                     return single_word_map[word]
-        
-        # 1.5 Respuestas de continuación
-        if len(t.split()) <= 2:
-            follow_up = ["si", "sí", "no", "dale", "ok", "bueno", "claro", "genial", "perfecto"]
-            if any(word in t for word in follow_up) and self.last_scenario:
-                return self.last_scenario
-        
-        # 3. Remover palabras vacías (stop words) para mejor detección
-        stop_words = {
-            "el", "la", "los", "las", "un", "una", "de", "del", "al", "para", 
-            "por", "con", "en", "a", "y", "o", "pero", "que", "mi", "me", "te",
-            "lo", "su", "sus", "se", "si", "no", "es", "son", "muy", "mas",
-            "como", "cuando", "donde", "quien", "cual"
-        }
+
+        # Remover stop words para mejor detección
+        stop_words = {"el", "la", "los", "las", "un", "una", "de", "del", "al", "para", "por", "con", "en", "a", "y", "o", "pero", "que", "mi", "me", "te", "lo", "su", "sus", "se", "si", "no", "es", "son", "muy", "mas", "como", "cuando", "donde", "quien", "cual"}
         words = [w for w in t.split() if w not in stop_words and len(w) > 2]
         normalized = " ".join(words)
-        
-        # 3. Detección por patrones de intención (frases completas)
+
+        # Detección por patrones de intención
         pattern_scores = {scen: 0 for scen in self.keywords.keys()}
         for scen, patterns in self.intent_patterns.items():
             for pattern in patterns:
                 if pattern in t:
-                    pattern_scores[scen] += 3  # Mayor peso a patrones de intención
-        
-        # 4. Detección por keywords (ahora más flexible con normalización)
+                    pattern_scores[scen] += 3
+
+        # Detección por keywords
         keyword_scores = {scen: 0 for scen in self.keywords.keys()}
         for scen, keys in self.keywords.items():
             for keyword in keys:
-                # Normalizar la keyword también
                 keyword_norm = normalize_text(keyword)
-                
-                # Búsqueda exacta (más peso)
                 if keyword_norm in t or keyword_norm in normalized:
                     keyword_scores[scen] += 2
                     continue
-                
-                # Búsqueda de palabras individuales de la keyword
                 keyword_words = keyword_norm.split()
                 if len(keyword_words) > 1:
-                    # Para frases multi-palabra, verificar si todas están
                     if all(kw in t for kw in keyword_words):
                         keyword_scores[scen] += 2
                         continue
-                
-                # Búsqueda aproximada (para typos)
                 for word in words:
                     if len(word) > 3 and self.similarity(word, keyword_norm) > 0.85:
                         keyword_scores[scen] += 1
-        
-        # 5. Combinar puntuaciones
+
+        # Combinar puntuaciones
         total_scores = {}
         for scen in self.keywords.keys():
             total_scores[scen] = pattern_scores[scen] + keyword_scores[scen]
-        
-        # 5.5 Boost de educación si hay palabras educativas
-        educational_triggers = ["que es", "como funciona", "explicar", "explicame", 
-                               "ensenar", "aprender", "sobre", "acerca de"]
+
+        # Boost de educación si hay palabras educativas
+        educational_triggers = ["que es", "como funciona", "explicar", "explicame", "ensenar", "aprender", "sobre", "acerca de"]
         if any(trigger in t for trigger in educational_triggers):
-            # Si es una pregunta educativa, pero también matchea otro escenario fuerte
-            # Dejar que el otro escenario gane si tiene buen score
             if total_scores.get('educacion', 0) > 0:
-                # Solo dar boost si no hay otro escenario con score alto
-                max_other = max([score for scen, score in total_scores.items() 
-                               if scen != 'educacion'], default=0)
-                if max_other < 2:  # Si otros escenarios son débiles
+                max_other = max([score for scen, score in total_scores.items() if scen != 'educacion'], default=0)
+                if max_other < 2:
                     total_scores['educacion'] += 1
-        
-        # 6. Retornar el mejor match
+
+        # Retornar el mejor match
         best = max(total_scores.items(), key=lambda x: x[1])
         if best[1] > 0:
             return best[0]
-        
-        # 7. Detección por contexto semántico (análisis simple)
-        # Si habla de números grandes → presupuesto o ahorro
-        if re.search(r'\d{5,}', t):  # Números de 5+ dígitos
+
+        # Detección por contexto semántico
+        if re.search(r'\d{5,}', t):
             if any(w in t for w in ["debo", "deb", "pagar", "cuota"]):
                 return "deudas"
             elif any(w in t for w in ["quiero", "comprar", "juntar", "necesito"]):
                 return "ahorro"
             else:
                 return "presupuesto"
-        
+
         # Si hace preguntas → educación
         if any(w in t for w in ["qué", "que", "cómo", "como", "por qué", "porque", "significa"]):
             return "educacion"
-        
+
         return "ayuda"
 
     def handle_presupuesto(self, text: str, dt: datetime) -> str:
