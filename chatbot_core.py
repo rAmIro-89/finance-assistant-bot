@@ -271,8 +271,12 @@ class ChatBot:
         t = normalize_text(text)
 
         # 0) INTENCIONES PRIORITARIAS ANTES DEL MAPEO DIRECTO
-        # Educación primero: si el usuario pide definiciones/explicaciones, priorizar EDUCACION
-        educational_triggers = ["que es", "qué es", "como funciona", "cómo funciona", "explicar", "explicame", "explicame", "significa", "que significa", "qué significa"]
+        # Educación primero: si el usuario pide definiciones/explicaciones o quiere aprender, priorizar EDUCACION
+        educational_triggers = [
+            "que es", "qué es", "como funciona", "cómo funciona",
+            "explicar", "explicame", "explícame", "significa", "que significa", "qué significa",
+            "aprender", "aprender sobre", "quiero aprender", "quiero aprender sobre"
+        ]
         if any(trig in t for trig in educational_triggers):
             return "educacion"
 
@@ -287,6 +291,11 @@ class ChatBot:
 
         # Ahorro: expresiones típicas de ahorro con 'plata' (dinero) o metas de viaje
         if any(kw in t for kw in ["necesito juntar plata", "juntar plata", "guardar dinero", "fondo de emergencia", "viajar", "viaje", "vacaciones", "europa"]):
+            return "ahorro"
+
+        # Ahorro: planificar/planear compra de bienes (casa/auto/moto/viaje) → es un plan de ahorro, no calculadora
+        ahorro_bienes = ["casa", "vivienda", "departamento", "depto", "auto", "carro", "coche", "vehiculo", "vehículo", "moto", "camioneta", "viaje", "vacaciones"]
+        if ("planear compra" in t or "planificar compra" in t or "plan de compra" in t) and any(b in t for b in ahorro_bienes):
             return "ahorro"
 
         # Casos coloquiales: "tengo X que hago" → inversiones (intención de invertir ese monto)
@@ -384,7 +393,7 @@ class ChatBot:
             total_scores[scen] = pattern_scores[scen] + keyword_scores[scen]
 
         # Boost de educación si hay palabras educativas
-        educational_triggers = ["que es", "como funciona", "explicar", "explicame", "ensenar", "aprender", "sobre", "acerca de"]
+        educational_triggers = ["que es", "como funciona", "explicar", "explicame", "ensenar", "aprender", "sobre", "acerca de", "quiero aprender"]
         if any(trigger in t for trigger in educational_triggers):
             if total_scores.get('educacion', 0) > 0:
                 max_other = max([score for scen, score in total_scores.items() if scen != 'educacion'], default=0)
