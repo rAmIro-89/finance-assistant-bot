@@ -55,6 +55,30 @@ def normalize_text(text: str) -> str:
     return text
 
 
+def parse_lucas(text: str) -> str:
+    """
+    Convierte la jerga argentina 'lucas' (miles) a números reales.
+    Ejemplos:
+    - '450 lucas' → '450000'
+    - 'cobro 200 lucas' → 'cobro 200000'
+    - '100 lucas por mes' → '100000 por mes'
+    """
+    # Patrón: número (entero o decimal) seguido de 'lucas' o 'luca'
+    # Captura espacios opcionales entre número y lucas
+    pattern = r'(\d+(?:[.,]\d+)?)\s*lucas?\b'
+    
+    def replace_lucas(match):
+        num_str = match.group(1).replace(',', '.')
+        num = float(num_str)
+        # Multiplicar por 1000 y convertir a entero si no tiene decimales
+        result = num * 1000
+        if result == int(result):
+            return str(int(result))
+        return str(result)
+    
+    return re.sub(pattern, replace_lucas, text, flags=re.IGNORECASE)
+
+
 def log_interaction(ts: datetime, scenario: str, user: str, bot: str, 
                     sentiment: str = "neutral", emotion: str = "none") -> None:
     # Crear encabezado si no existe
@@ -268,7 +292,9 @@ class ChatBot:
         return sentiment, emotion
 
     def detect(self, text: str) -> str:
-        t = normalize_text(text)
+        # Primero convertir "lucas" a miles antes de normalizar
+        text_with_lucas = parse_lucas(text)
+        t = normalize_text(text_with_lucas)
 
         # 0) INTENCIONES PRIORITARIAS ANTES DEL MAPEO DIRECTO
         # Educación primero: si el usuario pide definiciones/explicaciones o quiere aprender, priorizar EDUCACION
@@ -289,6 +315,16 @@ class ChatBot:
         if any(re.search(pat, t) for pat in calc_patterns):
             return "calculadora"
 
+        # PRIORIDAD: Preguntas de inversión con "dónde rinde", "dónde me conviene", "qué hago" + monto
+        # Esto debe ir ANTES de ahorro para capturar "donde rinde mas" correctamente
+        inversion_question_keywords = ["que hago", "que puedo hacer", "donde rinde", "rinde mas", "rinde más", 
+                                        "me conviene", "que me conviene", "donde me conviene", "donde poner", 
+                                        "donde meter", "donde invertir", "que hago con"]
+        if any(kw in t for kw in inversion_question_keywords):
+            # Verificar que haya mención de dinero/monto
+            if re.search(r"\d+", t) or any(money_kw in t for money_kw in ["lucas", "pesos", "plata", "dinero", "guita"]):
+                return "inversiones"
+
         # Ahorro: expresiones típicas de ahorro con 'plata' (dinero) o metas de viaje
         if any(kw in t for kw in ["necesito juntar plata", "juntar plata", "guardar dinero", "fondo de emergencia", "viajar", "viaje", "vacaciones", "europa"]):
             return "ahorro"
@@ -298,8 +334,14 @@ class ChatBot:
         if ("planear compra" in t or "planificar compra" in t or "plan de compra" in t) and any(b in t for b in ahorro_bienes):
             return "ahorro"
 
-        # Casos coloquiales: "tengo X que hago" → inversiones (intención de invertir ese monto)
-        if re.search(r"tengo\s+\$?\s*\d", t) and ("que hago" in t or "qué hago" in t):
+        # Casos coloquiales con dinero → inversiones
+        # "tengo X que hago", "me sobran X", "tengo X tiradas", etc.
+        money_question_patterns = [
+            r"(tengo|me sobran?|tengo.*tirad[oa]s?)\s+\$?\s*\d+",
+            r"\d+\s+(que hago|que puedo hacer|donde (poner|meter|invertir)|que me conviene)"
+        ]
+        
+        if any(re.search(pat, t) for pat in money_question_patterns):
             return "inversiones"
 
         # MAPEO DIRECTO de keywords prioritarias
@@ -421,6 +463,8 @@ class ChatBot:
         return "ayuda"
 
     def handle_presupuesto(self, text: str, dt: datetime) -> str:
+        # Convertir "lucas" primero
+        text = parse_lucas(text)
         m = re.search(r"\$?\s*(\d+(?:[.,]\d{3})*(?:[.,]\d{2})?)", text)
         
         if m:
@@ -461,6 +505,8 @@ class ChatBot:
 
 
     def handle_ahorro(self, text: str, dt: datetime) -> str:
+        # Convertir "lucas" primero
+        text = parse_lucas(text)
         t = text.lower()
         
         # Detectar metas específicas (mejorado con más keywords)
@@ -619,6 +665,8 @@ class ChatBot:
         )
 
     def handle_inversiones(self, text: str, dt: datetime) -> str:
+        # Convertir "lucas" primero
+        text = parse_lucas(text)
         t = text.lower()
         
         # DETECTAR ACTIVOS ESPECÍFICOS PRIMERO (respuestas especializadas)
@@ -953,6 +1001,8 @@ class ChatBot:
         )
 
     def handle_deudas(self, text: str, dt: datetime) -> str:
+        # Convertir "lucas" primero
+        text = parse_lucas(text)
         m = re.search(r"\$?\s*(\d+(?:[.,]\d{3})*(?:[.,]\d{2})?)", text)
         t = text.lower()
         
