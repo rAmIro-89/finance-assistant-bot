@@ -8,13 +8,13 @@ from typing import Dict, List
 def calcular_interes_compuesto(capital: float, tasa_anual: float, años: float, 
                                 aporte_mensual: float = 0) -> Dict:
     """
-    Calcula interés compuesto con aportes mensuales opcionales.
+    Calcula interés compuesto con ahorro mensual opcional.
     
     Args:
         capital: Capital inicial
         tasa_anual: Tasa de interés anual (ej: 10 para 10%)
         años: Años de inversión
-        aporte_mensual: Aporte mensual adicional
+        aporte_mensual: Ahorro/suma mensual adicional (cuánto agregas cada mes)
     
     Returns:
         Dict con monto final, total invertido, ganancia
@@ -160,12 +160,14 @@ def comparar_inversiones(monto: float, años: int) -> List[Dict]:
     """
     Compara diferentes opciones de inversión con el mismo monto y plazo.
     
+    NOTA: Las tasas son estimaciones históricas promedio y pueden variar según el mercado.
+    
     Args:
         monto: Monto a invertir
         años: Plazo en años
     
     Returns:
-        Lista de opciones con rendimientos
+        Lista de opciones con rendimientos estimados
     """
     opciones = [
         {"nombre": "Plazo Fijo", "tasa": 8.0, "riesgo": "Bajo"},

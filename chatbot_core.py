@@ -272,7 +272,10 @@ class ChatBot:
 
         # MAPEO DIRECTO de keywords prioritarias
         direct_map = {
-            "inversiones": ["invertir", "inversion", "aguinaldo", "oro", "gold", "plata", "silver", "dolar", "dollar", "cripto", "crypto", "bitcoin", "btc", "ethereum", "eth", "acciones", "accion", "stock", "bolsa", "plazo fijo", "cedear"],
+            "inversiones": ["invertir", "inversion", "inversiones", "aguinaldo", "oro", "gold", "plata", "silver", 
+                          "dolar", "dollar", "usd", "cripto", "crypto", "bitcoin", "btc", "ethereum", "eth",
+                          "acciones", "accion", "stock", "bolsa", "plazo fijo", "cedear", "cedears", "fci",
+                          "bonos", "bono", "etf", "rendimiento", "donde poner", "donde invertir"],
             "presupuesto": ["presupuesto", "organizar gastos", "distribuir ingresos", "gano", "ingreso"],
             "ahorro": ["ahorrar", "ahorro"],
             "deudas": ["deuda", "prestamo", "tarjeta", "credito", "debo", "pagar cuota"],
@@ -886,15 +889,15 @@ class ChatBot:
                     f"🧮 Simulación con interés compuesto:\n\n"
                     f"💰 Capital inicial: ${capital:,.0f}\n"
                     f"🕒 Plazo: {años:.1f} años ({int(años*12)} meses)\n"
-                    f"📈 Tasa: {tasa}% anual\n"
-                    f"💸 Aporte mensual: ${aporte:,.0f}\n\n"
-                    f"🎯 Resultado:\n"
+                    f"📈 Tasa: {tasa}% anual (estimada)\n"
+                    f"💸 Ahorro mensual: ${aporte:,.0f} (lo que sumás cada mes)\n\n"
+                    f"🎯 Resultado estimado:\n"
                     f"• Total invertido: ${resultado['total_invertido']:,.0f}\n"
                     f"• Monto final: ${resultado['monto_final']:,.0f}\n"
                     f"• Ganancia: ${resultado['ganancia']:,.0f} ({resultado['rendimiento_porcentaje']}%)\n\n"
                 )
 
-                sim += "¿Querés ajustar la tasa o agregar un aporte mensual distinto? Dime, por ejemplo: 'tasa 15% y aporte 10000'."
+                sim += "¿Querés ajustar la tasa o cambiar el ahorro mensual? Ejemplo: 'tasa 15% y ahorro 10000'."
                 return respuesta + sim
 
         # Si falta horizonte o monto, pedir lo que falte
@@ -913,7 +916,7 @@ class ChatBot:
         # Si tenemos ambos datos pero no pidió simular explícitamente, invitar a simular
         return (
             respuesta +
-            "¿Querés que simulemos interés compuesto? Podés decir 'dale' o indicar 'tasa 12% y aporte 0'."
+            "¿Querés que simulemos el rendimiento con interés compuesto? Podés decir 'dale' o indicar 'tasa 12% y ahorro mensual 5000'."
         )
 
     def handle_deudas(self, text: str, dt: datetime) -> str:
@@ -930,28 +933,35 @@ class ChatBot:
         if m:
             monto_str = m.group(1).replace(",", "")
             deuda = float(monto_str.replace(".", ""))
-            self.user_data['deuda'] = deuda
-            # Persistir deuda total si aplica
-            try:
-                update_user_fields(getattr(self, 'user_phone', 'web_user'), total_debt=deuda)
-            except Exception:
-                pass
             
             # Si estábamos esperando el pago mensual, guardar ambos datos
             if self.conversation_state['waiting_for'] == 'deuda_pago':
                 pago_mensual = deuda
-                deuda = self.conversation_state['partial_data'].get('deuda_total', 0)
-                meses = deuda / pago_mensual if pago_mensual > 0 else 0
-                self.conversation_state['waiting_for'] = None
-                self.conversation_state['partial_data'] = {}
+                deuda_total = self.conversation_state['partial_data'].get('deuda_total', 0)
                 
-                return (
-                    f"Perfecto! Con una deuda de ${deuda:,.0f} y pagos de ${pago_mensual:,.0f}/mes:\n\n"
-                    f"📅 Liquidarás tu deuda en {meses:.0f} meses\n"
-                    f"💰 Total a pagar: ${deuda:,.0f}\n\n"
-                    f"💡 Tip: Si puedes aumentar aunque sea $1000/mes, ahorrarás mucho en intereses.\n"
-                    f"¿Quieres que calcule con otro monto mensual?"
-                )
+                if pago_mensual > 0:
+                    meses = deuda_total / pago_mensual
+                    ahorro_interes = (deuda_total * 0.05) if meses < 12 else 0  # Estimado
+                    
+                    self.conversation_state['waiting_for'] = None
+                    self.conversation_state['partial_data'] = {}
+                    
+                    return (
+                        f"Perfecto! Con una deuda de ${deuda_total:,.0f} y pagos de ${pago_mensual:,.0f}/mes:\n\n"
+                        f"📅 Liquidarás tu deuda en aproximadamente {meses:.0f} meses ({meses/12:.1f} años)\n"
+                        f"💰 Total a pagar: ${deuda_total:,.0f}\n\n"
+                        f"💡 Tip: Si puedes aumentar aunque sea $5,000/mes más, terminarás antes y ahorrarás en intereses.\n"
+                        f"¿Quieres que simule con otro monto mensual de pago?"
+                    )
+                else:
+                    return "⚠️ El monto mensual debe ser mayor a 0. ¿Cuánto puedes pagar mensualmente?"
+            
+            # Primera vez: registrar la deuda total
+            self.user_data['deuda'] = deuda
+            try:
+                update_user_fields(getattr(self, 'user_phone', 'web_user'), total_debt=deuda)
+            except Exception:
+                pass
             
             # Calcular planes de pago
             meses_6 = deuda / 6
@@ -969,7 +979,7 @@ class ChatBot:
                 )
             
             respuesta += (
-                f"📅 Planes de pago sugeridos:\n"
+                f"📅 Planes de pago sugeridos (sin contar intereses):\n"
                 f"• 6 meses: ${meses_6:,.0f}/mes (rápido pero intenso)\n"
                 f"• 12 meses: ${meses_12:,.0f}/mes (equilibrado)\n"
                 f"• 18 meses: ${meses_18:,.0f}/mes (más manejable)\n\n"
@@ -983,7 +993,7 @@ class ChatBot:
             # Preguntar cuánto puede pagar mensualmente
             self.conversation_state['waiting_for'] = 'deuda_pago'
             self.conversation_state['partial_data']['deuda_total'] = deuda
-            respuesta += "¿Cuánto puedes pagar mensualmente?"
+            respuesta += "💬 Ahora dime: ¿Cuánto puedes pagar **por mes** para saldar esta deuda?"
         
         else:
             respuesta = "Entiendo que tienes deudas. No te preocupes, hay solución. 💪\n\n"
@@ -1004,7 +1014,7 @@ class ChatBot:
             "• Busca ingresos extras (freelance, venta)\n"
             "• Negocia tasas con los bancos\n"
             "• No pidas más crédito mientras pagas\n\n"
-            "¿Cuánto puedes destinar mensualmente a pagar deudas?"
+            "💬 Dime: ¿Cuánto puedes destinar **mensualmente** a pagar deudas?"
         )
         
         return respuesta
@@ -1031,13 +1041,14 @@ class ChatBot:
                     f"📊 Simulación de Inversión:\n\n"
                     f"💰 Capital inicial: ${capital:,.0f}\n"
                     f"📅 Plazo: {años} años\n"
-                    f"📈 Tasa: {tasa}% anual\n"
-                    f"💸 Aporte mensual: ${aporte:,.0f}\n\n"
-                    f"🎯 RESULTADO:\n"
+                    f"📈 Tasa: {tasa}% anual (estimada)\n"
+                    f"💸 Ahorro mensual: ${aporte:,.0f} (lo que sumás cada mes)\n\n"
+                    f"🎯 RESULTADO ESTIMADO:\n"
                     f"• Total invertido: ${resultado['total_invertido']:,.0f}\n"
                     f"• Monto final: ${resultado['monto_final']:,.0f}\n"
                     f"• Ganancia: ${resultado['ganancia']:,.0f} ({resultado['rendimiento_porcentaje']}%)\n\n"
-                    f"💡 Tip: El interés compuesto es tu mejor aliado a largo plazo!"
+                    f"💡 Tip: El interés compuesto es tu mejor aliado a largo plazo!\n"
+                    f"⚠️ Nota: Tasas son estimadas y pueden variar según el mercado."
                 )
         
         elif any(w in t for w in ["cuota", "prestamo", "préstamo", "financiar"]):
