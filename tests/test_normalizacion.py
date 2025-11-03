@@ -48,21 +48,24 @@ def test_deteccion_contexto():
     scenario1 = bot.detect(msg1)
     print(f"User: {msg1}")
     print(f"Escenario detectado: {scenario1}")
-    bot.reply(msg1, dt)
+    # Avanzar el estado usando la API pública actual
+    bot.process(msg1, dt)
     
     msg2 = "casa"
     scenario2 = bot.detect(msg2)
     print(f"\nUser: {msg2}")
     print(f"Escenario detectado: {scenario2}")
     print(f"Estado: waiting_for={bot.conversation_state.get('waiting_for')}")
-    bot.reply(msg2, dt)
+    # Avanzar el estado con el mensaje de meta
+    bot.process(msg2, dt)
     
     msg3 = "500000"
     scenario3 = bot.detect(msg3)
     print(f"\nUser: {msg3}")
     print(f"Escenario detectado: {scenario3}")
     print(f"Estado: waiting_for={bot.conversation_state.get('waiting_for')}")
-    bot.reply(msg3, dt)
+    # Avanzar el estado con el monto
+    bot.process(msg3, dt)
     
     # CASO 2: Presupuesto → 80000
     print("\n\n📝 CASO 2: Presupuesto con ingreso")
@@ -74,7 +77,8 @@ def test_deteccion_contexto():
     scenario1 = bot2.detect(msg1)
     print(f"User: {msg1}")
     print(f"Escenario detectado: {scenario1}")
-    bot2.reply(msg1, dt)
+    # Avanzar el estado para presupuesto
+    bot2.process(msg1, dt)
     
     msg2 = "80000"
     scenario2 = bot2.detect(msg2)
