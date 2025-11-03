@@ -230,4 +230,35 @@ Ideas para implementar:
 
 ---
 
+## 📌 Último análisis rápido (snapshot)
+
+Fecha: 2025-11-03 16:45
+
+Resumen desde NAS (/logs):
+- Total: 808 interacciones
+- Distribución: 255 Inversiones (31.6%), 157 Presupuestos (19.4%), 77 Ahorros (9.5%), 84 Deudas (10.4%)
+- Sin clasificar: 141 (17.5%) — aceptable, pero hay margen para bajar a ~10–12%
+
+Hallazgos principales:
+- Deudas: En frases con dos montos, se invirtieron valores. Ej: "mi deuda es de 1000000 y puedo destinar a pagar 20000" → respondió como deuda $20k y pago $1M/mes.
+- "plata" ambiguo: Mensajes como "debo plata en la tarjeta" o "necesito juntar plata" fueron tratados como inversión en metal plata (incorrecto en español rioplatense: "plata"=dinero).
+- Continuaciones cortas: "si/dale/ok" y números sueltos no se engancharon al contexto anterior → caen en AYUDA o PRESUPUESTO.
+- Intención cálculo: "cuánto ganaría invirtiendo 100000" respondió con opciones genéricas, no con calculadora de interés compuesto.
+
+Quick wins propuestos (próximo ciclo):
+1) Deudas: Parser robusto para dos números en una misma oración (total y pago mensual) sin invertirlos.
+2) Detectar "plata" como dinero por defecto; solo mapear a metal cuando sea "comprar/invertir en plata" o "oro vs plata".
+3) Ruta calculadora para patrones "cuánto ganaría invirtiendo {monto}"; pedir tasa y plazo si faltan.
+4) Confirmaciones "si/dale/ok" y respuestas tipo "24 meses" respetan conversation_state.waiting_for.
+5) Números sueltos heredan la intención previa (inversiones=capital; deudas=total/pago según paso; ahorro=ahorro mensual/meta).
+
+Impacto esperado:
+- Reducir "Sin clasificar" ~5–7 pp.
+- Eliminar bug de intercambio de montos en deudas.
+- Menos respuestas genéricas en inversiones cuando hay intención de cálculo.
+
+Estado: Pendiente de implementación y despliegue.
+
+---
+
 **Última actualización:** 29 de octubre de 2025

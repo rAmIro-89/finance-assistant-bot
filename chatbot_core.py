@@ -270,15 +270,39 @@ class ChatBot:
     def detect(self, text: str) -> str:
         t = normalize_text(text)
 
+        # 0) INTENCIONES PRIORITARIAS ANTES DEL MAPEO DIRECTO
+        # Educación primero: si el usuario pide definiciones/explicaciones, priorizar EDUCACION
+        educational_triggers = ["que es", "qué es", "como funciona", "cómo funciona", "explicar", "explicame", "explicame", "significa", "que significa", "qué significa"]
+        if any(trig in t for trig in educational_triggers):
+            return "educacion"
+
+        # Calculadoras: consultas de cálculo (simular, cuánto ganaría, interés compuesto, comparar opciones)
+        calc_patterns = [
+            r"cuanto\s+ganar(ia)?\b", r"si\s+invierto\b", r"interes\s+compuesto", r"simula(r)?\b",
+            r"simular\s+prestamo", r"cuota\s+de\s+prestamo", r"en\s+cuanto\s+tiempo\s+pago",
+            r"compar(ar|o)\s+opciones\s+de\s+inversion"
+        ]
+        if any(re.search(pat, t) for pat in calc_patterns):
+            return "calculadora"
+
+        # Ahorro: expresiones típicas de ahorro con 'plata' (dinero) o metas de viaje
+        if any(kw in t for kw in ["necesito juntar plata", "juntar plata", "guardar dinero", "fondo de emergencia", "viajar", "viaje", "vacaciones", "europa"]):
+            return "ahorro"
+
+        # Casos coloquiales: "tengo X que hago" → inversiones (intención de invertir ese monto)
+        if re.search(r"tengo\s+\$?\s*\d", t) and ("que hago" in t or "qué hago" in t):
+            return "inversiones"
+
         # MAPEO DIRECTO de keywords prioritarias
         direct_map = {
-            "inversiones": ["invertir", "inversion", "inversiones", "aguinaldo", "oro", "gold", "plata", "silver", 
+            "inversiones": ["invertir", "inversion", "inversiones", "aguinaldo", "oro", "gold",
                           "dolar", "dollar", "usd", "cripto", "crypto", "bitcoin", "btc", "ethereum", "eth",
                           "acciones", "accion", "stock", "bolsa", "plazo fijo", "cedear", "cedears", "fci",
                           "bonos", "bono", "etf", "rendimiento", "donde poner", "donde invertir"],
             "presupuesto": ["presupuesto", "organizar gastos", "distribuir ingresos", "gano", "ingreso"],
             "ahorro": ["ahorrar", "ahorro"],
             "deudas": ["deuda", "prestamo", "tarjeta", "credito", "debo", "pagar cuota"],
+            # 'educacion' y 'calculadora' ya priorizados arriba, pero mantenemos por compatibilidad
             "educacion": ["que es", "como funciona", "explicar", "explicame", "ensenar", "aprender"],
             "calculadora": ["calculadora", "calcular", "simular"]
         }
@@ -930,6 +954,13 @@ class ChatBot:
         
         respuesta = ""
         
+        # Extraer todos los números presentes
+        nums_raw = re.findall(r"\$?\s*(\d+(?:[.,]\d{3})*(?:[.,]\d{2})?)", text)
+        nums = []
+        for nr in nums_raw:
+            v = float(nr.replace(",", "").replace(".", ""))
+            nums.append(v)
+
         if m:
             monto_str = m.group(1).replace(",", "")
             deuda = float(monto_str.replace(".", ""))
@@ -956,7 +987,24 @@ class ChatBot:
                 else:
                     return "⚠️ El monto mensual debe ser mayor a 0. ¿Cuánto puedes pagar mensualmente?"
             
-            # Primera vez: registrar la deuda total
+            # Si el mensaje trae dos montos (deuda total y pago mensual), calcular directo
+            if len(nums) >= 2 and any(k in t for k in ["pago", "pagar", "por mes", "mensual"]):
+                # Heurística simple: mayor = deuda total, menor = pago mensual
+                deuda_total = max(nums)
+                pago_mensual = min(nums)
+                if pago_mensual > 0:
+                    meses = deuda_total / pago_mensual
+                    self.conversation_state['waiting_for'] = None
+                    self.conversation_state['partial_data'] = {}
+                    return (
+                        f"Perfecto! Con una deuda de ${deuda_total:,.0f} y pagos de ${pago_mensual:,.0f}/mes:\n\n"
+                        f"📅 Liquidarás tu deuda en aproximadamente {meses:.0f} meses ({meses/12:.1f} años)\n"
+                        f"💰 Total a pagar: ${deuda_total:,.0f}\n\n"
+                        f"💡 Tip: Si puedes aumentar aunque sea $5,000/mes más, terminarás antes y ahorrarás en intereses.\n"
+                        f"¿Quieres que simule con otro monto mensual de pago?"
+                    )
+
+            # Primera vez: registrar la deuda total (solo 1 monto presente)
             self.user_data['deuda'] = deuda
             try:
                 update_user_fields(getattr(self, 'user_phone', 'web_user'), total_debt=deuda)

@@ -1,3 +1,37 @@
+# Entorno virtual y cachés
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Archivos de base de datos y logs
+*.db
+*.csv
+*.json
+chat_logs*
+live_test_results.json
+test_complex_v2_3_results.json
+test_complex_v2_4_results.json
+test_complex_v2_5_results.json
+errors_report.json
+
+# Archivos de entorno y secretos
+.env
+.env.*
+
+# Backups y archivos temporales
+*backup*
+
+# Notebooks experimentales
+*.ipynb
+
+# Scripts locales y archivos personales
+COMANDOS_RAPIDOS.txt
+iniciar_ngrok.bat
+sync_logs_from_nas.bat
+deploy_to_nas.bat
+
+# Otros archivos innecesarios
+Chatbot24x7_Proyecto.ipynb
 # Python
 __pycache__/
 *.py[cod]
