@@ -307,6 +307,15 @@ class ChatBot:
         ]
         # También capturar conceptos financieros sueltos como "inflacion", "interes", "devaluacion"
         educational_single_words = ["inflacion", "devaluacion", "tasa", "tna", "tea", "cer", "uva", "cedear", "fci", "etf"]
+        
+        # Conceptos educativos multi-palabra (antes que triggers simples)
+        educational_phrases = [
+            "interes simple", "interes compuesto", "simple vs compuesto", "vs compuesto",
+            "diversificacion", "diversificar", "oro como inversion", "ahorro vs inversion"
+        ]
+        if any(phrase in t for phrase in educational_phrases):
+            return "educacion"
+            
         if any(trig in t for trig in educational_triggers):
             return "educacion"
         # Si es una sola palabra de concepto financiero, ir a educación
@@ -331,11 +340,17 @@ class ChatBot:
                     return "educacion"
 
         # Calculadoras: consultas de cálculo (simular, cuánto ganaría, interés compuesto, comparar opciones)
+        # PERO si venimos de inversiones y hay "simular" + números, mantener inversiones
         calc_patterns = [
-            r"cuanto\s+ganar(ia)?\b", r"si\s+invierto\b", r"interes\s+compuesto", r"simula(r)?\b",
+            r"cuanto\s+ganar(ia)?\b", r"si\s+invierto\b", r"interes\s+compuesto", 
             r"simular\s+prestamo", r"cuota\s+de\s+prestamo", r"en\s+cuanto\s+tiempo\s+pago",
             r"compar(ar|o)\s+opciones\s+de\s+inversion"
         ]
+        
+        # Si venimos de inversiones y el usuario dice "simular" con números, mantener inversiones
+        if last == "inversiones" and ("simular" in t or "simula" in t) and re.search(r"\d+", t):
+            return "inversiones"
+        
         if any(re.search(pat, t) for pat in calc_patterns):
             return "calculadora"
 
@@ -758,7 +773,8 @@ class ChatBot:
             r"bonos\s+(usa|treasury)"
         ]
         if self.conversation_state.get('waiting_for') == 'explicar_bonos_usd' or any(re.search(p, t_norm) for p in explain_bonos_patterns):
-            self.conversation_state['waiting_for'] = None
+            # Cambiar el estado para esperar simulación de bonos USD
+            self.conversation_state['waiting_for'] = 'simular_bonos_usd'
             guia = (
                 "🧭 Cómo comprar bonos en dólares (AR, guía general)\n\n"
                 "1) Abrí una cuenta en un broker regulado (BYMA/MAE).\n"
@@ -773,7 +789,7 @@ class ChatBot:
                 "   • No son bonos directos, pero replican índices de bonos.\n\n"
                 "⚠️ Tené en cuenta: comisiones, plazos de 'parking' y regulaciones pueden cambiar.\n"
                 "   Consultá condiciones actuales en tu broker.\n\n"
-                "¿Querés que te ayude a simular un objetivo con estos bonos (monto y plazo)?"
+                "💡 ¿Querés que simule cuánto podrías ganar? (ejemplo: 'simular 100000 por 2 años')"
             )
             return guia
         
@@ -996,10 +1012,87 @@ class ChatBot:
 
         # Recuperar contexto previo de inversiones si existe
         inv_ctx = self.conversation_state['partial_data'].get('inversion', {})
+        
+        # LÓGICA ESPECIAL: Si el usuario solo da horizonte nuevo y ya tenemos monto en contexto
+        # (DEBE ir ANTES de recuperar valores del contexto)
+        if horizonte_meses is not None and monto is None and inv_ctx.get('monto'):
+            monto_ctx = inv_ctx['monto']
+            años = horizonte_meses / 12
+            respuesta_horizonte = (
+                f"✅ Perfecto! Entonces tenemos:\n\n"
+                f"💰 Monto: ${monto_ctx:,.0f}\n"
+                f"🕒 Plazo: {años:.1f} años\n\n"
+                f"📈 Para este horizonte te recomiendo:\n\n"
+            )
+            
+            if años <= 1:
+                respuesta_horizonte += (
+                    "🟢 **Plazo corto (hasta 1 año):**\n"
+                    "• FCI Money Market: Liquidez + seguridad\n"
+                    "• Plazo fijo UVA: Protección inflación\n"
+                    "• Bonos cortos (Lecap): Algo más de renta\n"
+                )
+            elif años <= 3:
+                respuesta_horizonte += (
+                    "🟡 **Plazo medio (1-3 años):**\n"
+                    "• 60% Bonos CER: Ajuste por inflación\n"
+                    "• 30% FCI balanceado: Diversificación\n"
+                    "• 10% ETF global: Crecimiento moderado\n"
+                )
+            else:
+                respuesta_horizonte += (
+                    "🔵 **Plazo largo (3+ años):**\n"
+                    "• 50% ETFs globales: Crecimiento a largo plazo\n"
+                    "• 30% Bonos/FCI: Estabilidad\n"
+                    "• 20% CEDEARs: Empresas extranjeras\n"
+                )
+            
+            respuesta_horizonte += f"\n¿Querés que simule el rendimiento con estos valores?"
+            
+            # Actualizar contexto completo
+            self.conversation_state['partial_data']['inversion'] = {'monto': monto_ctx, 'horizonte_meses': horizonte_meses}
+            return respuesta_horizonte
+
+        # Ahora sí recuperar valores del contexto normalmente
         if monto is None and 'monto' in inv_ctx:
             monto = inv_ctx['monto']
         if horizonte_meses is None and 'horizonte_meses' in inv_ctx:
             horizonte_meses = inv_ctx['horizonte_meses']
+            años = horizonte_meses / 12
+            respuesta_horizonte = (
+                f"✅ Perfecto! Entonces tenemos:\n\n"
+                f"💰 Monto: ${monto:,.0f}\n"
+                f"🕒 Plazo: {años:.1f} años\n\n"
+                f"📈 Para este horizonte te recomiendo:\n\n"
+            )
+            
+            if años <= 1:
+                respuesta_horizonte += (
+                    "🟢 **Plazo corto (hasta 1 año):**\n"
+                    "• FCI Money Market: Liquidez + seguridad\n"
+                    "• Plazo fijo UVA: Protección inflación\n"
+                    "• Bonos cortos (Lecap): Algo más de renta\n"
+                )
+            elif años <= 3:
+                respuesta_horizonte += (
+                    "🟡 **Plazo medio (1-3 años):**\n"
+                    "• 60% Bonos CER: Ajuste por inflación\n"
+                    "• 30% FCI balanceado: Diversificación\n"
+                    "• 10% ETF global: Crecimiento moderado\n"
+                )
+            else:
+                respuesta_horizonte += (
+                    "🔵 **Plazo largo (3+ años):**\n"
+                    "• 50% ETFs globales: Crecimiento a largo plazo\n"
+                    "• 30% Bonos/FCI: Estabilidad\n"
+                    "• 20% CEDEARs: Empresas extranjeras\n"
+                )
+            
+            respuesta_horizonte += f"\n¿Querés que simule el rendimiento con estos valores?"
+            
+            # Actualizar contexto completo
+            self.conversation_state['partial_data']['inversion'] = {'monto': monto, 'horizonte_meses': horizonte_meses}
+            return respuesta_horizonte
 
         respuesta = "📈 Opciones de inversión:\n\n"
         
@@ -1048,6 +1141,8 @@ class ChatBot:
             años = horizonte_meses / 12
             respuesta += f"🕒 Horizonte: {horizonte_meses} meses ({años:.1f} años)\n\n"
 
+
+
         # Guardar contexto parcial de inversiones
         if monto is not None or horizonte_meses is not None:
             self.conversation_state['partial_data']['inversion'] = {
@@ -1058,6 +1153,41 @@ class ChatBot:
         # Detectar confirmación para simular
         confirm_words = ["dale", "si", "sí", "ok", "okay", "listo", "perfecto", "genial", "hace", "hazlo", "simula", "simular"]
         wants_simulation = any(w in t for w in confirm_words) or ("simular" in t or "simula" in t)
+        
+        # Simular bonos USD específicamente si el usuario confirma tras la guía de bonos
+        if wants_simulation and self.conversation_state.get('waiting_for') == 'simular_bonos_usd':
+            self.conversation_state['waiting_for'] = None
+            # Si hay números en el mensaje, usarlos para simular bonos USD
+            if nums:
+                monto_bonos = max([x for x in nums if x >= 1000], default=100000)  # min 1000 USD
+                años_bonos = 2  # default
+                if tiene_ano and nums:
+                    años_bonos = max([int(x) for x in nums if 0.1 <= x <= 30], default=2)
+                
+                # Tasa típica de bonos Treasury USA (4-5%)
+                tasa_bonos = 4.5
+                resultado_usd = calcular_interes_compuesto(monto_bonos, tasa_bonos, años_bonos, 0)
+                
+                return (
+                    f"🧮 Simulación Bonos Treasury USD:\n\n"
+                    f"💵 Capital: USD {monto_bonos:,.0f}\n"
+                    f"🕒 Plazo: {años_bonos} años\n"
+                    f"📈 Tasa: {tasa_bonos}% anual (típica Treasury)\n\n"
+                    f"🎯 Resultado:\n"
+                    f"• Capital final: USD {resultado_usd['monto_final']:,.0f}\n"
+                    f"• Ganancia: USD {resultado_usd['ganancia']:,.0f}\n\n"
+                    f"💡 En pesos (aprox): ${resultado_usd['monto_final']*1000:,.0f} "
+                    f"(asumiendo dólar a $1000)\n\n"
+                    f"⚠️ Recordá: tasas y tipo de cambio pueden variar.\n"
+                    f"Esta es una estimación para planificar.\n\n"
+                    f"¿Querés info sobre otras inversiones o cómo diversificar?"
+                )
+            else:
+                return (
+                    "💡 Para simular bonos USD, decime el monto y plazo.\n"
+                    "Ejemplo: 'simular USD 50000 por 3 años'\n\n"
+                    "¿O preferís info sobre otras inversiones?"
+                )
 
         # Si tenemos suficiente contexto y el usuario confirma, simular con defaults si no dio tasa/aporte
         if wants_simulation and self.conversation_state['partial_data'].get('inversion'):
@@ -1370,6 +1500,29 @@ class ChatBot:
         t = normalize_text(text)
         
         # Detectar conceptos específicos (ya normalizados)
+        
+        # FCI - Fondos Comunes de Inversión
+        if "fci" in t or "fondo comun" in t or "fondos comunes" in t:
+            return (
+                "📚 FCI - Fondos Comunes de Inversión\n\n"
+                "¿Qué es un FCI?\n"
+                "• Un fondo donde muchos inversores aportan dinero\n"
+                "• Un gestor profesional invierte ese dinero\n"
+                "• Vos comprás 'cuotapartes' del fondo\n\n"
+                "Ventajas:\n"
+                "✅ Diversificación automática\n"
+                "✅ Gestión profesional\n"
+                "✅ Acceso desde montos bajos\n"
+                "✅ Liquidez (podés salir cuando quieras)\n\n"
+                "Tipos principales:\n"
+                "• Money Market (muy conservador)\n"
+                "• Renta Fija (bonos)\n"
+                "• Renta Variable (acciones)\n"
+                "• Balanceados (mix)\n\n"
+                "💡 Ideal para empezar a invertir con poco conocimiento.\n\n"
+                "¿Te interesa saber cómo empezar con FCIs?"
+            )
+        
         if "inflacion" in t:
             return (
                 "📚 La inflación es el aumento generalizado de precios.\n\n"
