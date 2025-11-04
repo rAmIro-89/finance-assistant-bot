@@ -3,11 +3,11 @@
 __pycache__/
 .pytest_cache/
 
-# Archivos de base de datos y logs
+# Archivos de base de datos y logs (específicos)
 *.db
-*.csv
-*.json
-chat_logs*
+chat_logs.csv
+chat_logs_backup*.csv
+logs_dashboard.html
 live_test_results.json
 test_complex_v2_3_results.json
 test_complex_v2_4_results.json
@@ -21,17 +21,11 @@ errors_report.json
 # Backups y archivos temporales
 *backup*
 
-# Notebooks experimentales
+# Notebooks experimentales (permite notebooks pero excluye temporales grandes si es necesario)
 *.ipynb
 
-# Scripts locales y archivos personales
-COMANDOS_RAPIDOS.txt
-iniciar_ngrok.bat
-sync_logs_from_nas.bat
-deploy_to_nas.bat
-
-# Otros archivos innecesarios
-Chatbot24x7_Proyecto.ipynb
+# Scripts locales útiles (se incluyen en el repo)
+# (removidos de ignore para poder versionarlos)
 # Python
 __pycache__/
 *.py[cod]
@@ -54,12 +48,13 @@ dist/
 
 # Datos sensibles y archivos locales
 .env
-*.db
 *.sqlite
 *.sqlite3
-chat_logs.csv
-chat_logs_backup*.csv
-logs_dashboard.html
+
+# Tests ad-hoc y reportes locales (no versionar)
+test_mejoras_*.py
+test_conversation.py
+VALIDATION_*.md
 
 # Docker
 .dockerignore
@@ -70,17 +65,5 @@ Thumbs.db
 *.bak
 *.tmp
 
-# Documentacion y scripts locales
-ASUSTOR_DEPLOY.md
-COMANDOS_RAPIDOS.txt
-Chatbot24x7_Proyecto.ipynb
-DESPLIEGUE_NAS.md
-ESTRUCTURA_PROYECTO.md
-deploy.sh
-iniciar_ngrok.bat
-prepare-deploy.ps1
-test_conversation.py
-test-docker.ps1
-deploy_to_nas.bat
-sync_logs_from_nas.bat
-generate_logs_dashboard.py
+# Documentación y scripts (permitidos en el repo)
+# (no ignorar para asegurar que GitHub tenga la guía completa)

@@ -303,8 +303,30 @@ class ChatBot:
             "explicar", "explicame", "explícame", "significa", "que significa", "qué significa",
             "aprender", "aprender sobre", "quiero aprender", "quiero aprender sobre"
         ]
+        # También capturar conceptos financieros sueltos como "inflacion", "interes", "devaluacion"
+        educational_single_words = ["inflacion", "devaluacion", "tasa", "tna", "tea", "cer", "uva", "cedear", "fci", "etf"]
         if any(trig in t for trig in educational_triggers):
             return "educacion"
+        # Si es una sola palabra de concepto financiero, ir a educación
+        if len(t.split()) == 1 and t in educational_single_words:
+            return "educacion"
+        
+        # MEJORA 2: Acrónimos financieros (incluso con ?) → educación
+        # Casos: "cer?", "que es cer", "uva", etc.
+        financial_acronyms = ["cer", "uva", "tna", "tea", "cft"]
+        # Limpiar signos de puntuación para detectar "cer?" como "cer"
+        t_clean = t.replace("?", "").replace("!", "").replace(".", "").replace(",", "").strip()
+        # Solo si es muy corto (1-2 palabras) o tiene ? → educación
+        if len(t_clean.split()) <= 2 or "?" in text:
+            for acr in financial_acronyms:
+                if acr in t_clean.split():
+                    return "educacion"
+        # FCI, CEDEAR, ETF solos con ? o "que es" → educación (prioridad sobre inversiones)
+        invest_acronyms = ["fci", "cedear", "cedears", "etf", "etfs"]
+        if "?" in text or "que es" in t:
+            for acr in invest_acronyms:
+                if acr in t_clean.split():
+                    return "educacion"
 
         # Calculadoras: consultas de cálculo (simular, cuánto ganaría, interés compuesto, comparar opciones)
         calc_patterns = [
@@ -327,6 +349,18 @@ class ChatBot:
 
         # Ahorro: expresiones típicas de ahorro con 'plata' (dinero) o metas de viaje
         if any(kw in t for kw in ["necesito juntar plata", "juntar plata", "guardar dinero", "fondo de emergencia", "viajar", "viaje", "vacaciones", "europa"]):
+            return "ahorro"
+
+        # MEJORA 1: Detectar "quiero viajar a [destino]" como ahorro
+        # Patrones: viajar/vacacionar/conocer/ir/visitar + a/en + [destino/lugar]
+        travel_patterns = [
+            r"viajar\s+(a|en)",
+            r"vacacionar\s+(a|en)",
+            r"conocer\s+[a-záéíóúñ]+",
+            r"visitar\s+[a-záéíóúñ]+",
+            r"ir\s+a\s+[a-záéíóúñ]+"
+        ]
+        if any(re.search(pat, t) for pat in travel_patterns):
             return "ahorro"
 
         # Ahorro: planificar/planear compra de bienes (casa/auto/moto/viaje) → es un plan de ahorro, no calculadora
@@ -366,18 +400,29 @@ class ChatBot:
         partial = self.conversation_state.get('partial_data', {})
         last = self.last_scenario
 
-        # Mejor manejo de respuestas cortas y números sueltos
+        # MEJORA 3: Manejo robusto de respuestas cortas y contexto
         short_confirm = ["si", "sí", "no", "dale", "ok", "bueno", "claro", "genial", "perfecto"]
+        
+        # Si hay un waiting_for activo, SIEMPRE mantener el escenario (prioridad máxima)
+        if waiting:
+            return last or "ayuda"
+        
         # Si la respuesta es muy corta y hay contexto fuerte, mantener escenario anterior
         if len(t.split()) <= 3:
-            if waiting or last in ["presupuesto", "ahorro", "deudas", "inversiones"]:
-                return last or "ayuda"
-            if any(word in t for word in short_confirm):
-                return last or "ayuda"
+            if last in ["presupuesto", "ahorro", "deudas", "inversiones"]:
+                # Respuestas de confirmación
+                if any(word in t for word in short_confirm):
+                    return last
+                # Números con posible contexto temporal (meses, años)
+                if re.search(r'\d+\s*(mes|meses|año|años|anio|anios)', t):
+                    return last
+                # Números solos si hay contexto fuerte
+                if re.match(r'^\d+[\d\s.,]*$', t):
+                    return last
 
         # Si es solo un número y hay contexto previo
         if re.match(r'^\d+[\d\s.,]*$', t):
-            if waiting or last in ["presupuesto", "ahorro", "deudas", "inversiones"]:
+            if last in ["presupuesto", "ahorro", "deudas", "inversiones"]:
                 return last or "ayuda"
 
         # Detección de metas de ahorro (una palabra)
@@ -526,7 +571,28 @@ class ChatBot:
                 break  # Solo tomar la primera meta detectada
         
         # Extraer monto objetivo si existe
-        m = re.search(r"\$?\s*(\d+(?:[.,]\d{3})*(?:[.,]\d{2})?)", text)
+        # CRÍTICO: Detectar primero si hay palabras temporales para evitar confusión
+        tiene_temporal = any(k in t for k in ["mes", "meses", "año", "años", "anio", "anios", "a.", "m."])
+        
+        # Extraer números
+        nums_raw = re.findall(r"\d+(?:[.,]\d+)?", text)
+        nums = [float(n.replace('.', '').replace(',', '')) for n in nums_raw] if nums_raw else []
+        
+        # Si hay palabra temporal, filtrar números pequeños (probablemente sean plazo, no monto)
+        monto_candidatos = []
+        if tiene_temporal:
+            # Solo considerar números >= 100 como monto (evita confundir "3 meses" con $3)
+            monto_candidatos = [x for x in nums if x >= 100]
+        else:
+            # Sin temporal, cualquier número puede ser monto
+            monto_candidatos = nums
+        
+        # Determinar si tenemos monto
+        tiene_monto = False
+        objetivo = None
+        if monto_candidatos:
+            objetivo = max(monto_candidatos)
+            tiene_monto = True  # Flag para indicar que hay monto
         
         # CASO 1: Detectamos META en el mensaje
         if metas_detectadas:
@@ -538,9 +604,7 @@ class ChatBot:
             respuesta = f"¡Excelente meta: {meta_str}! 🎯\n\n"
             
             # CASO 1A: Tenemos META + MONTO
-            if m:
-                monto_str = m.group(1).replace(",", "")
-                objetivo = float(monto_str.replace(".", ""))
+            if tiene_monto and objetivo:
                 self.user_data['objetivo_ahorro'] = objetivo
                 
                 # Persistir meta de ahorro
@@ -575,9 +639,7 @@ class ChatBot:
                 return respuesta + f"¿Cuánto necesitas ahorrar para {meta_str}?"
         
         # CASO 2: NO hay meta pero SÍ hay MONTO (y estábamos esperando monto)
-        if m and self.conversation_state.get('waiting_for') == 'ahorro_monto':
-            monto_str = m.group(1).replace(",", "")
-            objetivo = float(monto_str.replace(".", ""))
+        if tiene_monto and objetivo and self.conversation_state.get('waiting_for') == 'ahorro_monto':
             meta_str = self.conversation_state['partial_data'].get('meta', 'tu meta')
             self.user_data['objetivo_ahorro'] = objetivo
             
@@ -618,8 +680,8 @@ class ChatBot:
                 m_años = re.search(r"(\d+)\s*a[ñn]o", t)
                 if m_años:
                     meses = int(m_años.group(1)) * 12
-            elif m:  # Solo un número, asumimos meses
-                meses = int(float(m.group(1)))
+            elif nums:  # Solo un número, asumimos meses
+                meses = int(max(nums))
             
             if meses:
                 objetivo = self.conversation_state['partial_data'].get('monto', 0)
@@ -855,23 +917,34 @@ class ChatBot:
         monto: Optional[float] = None
         horizonte_meses: Optional[int] = None
 
-        # Heurísticas de horizonte
-        if any(k in t for k in ["mes", "meses", "m."]):
-            candidatos = [int(x) for x in nums if x <= 120]
+        # CRÍTICO: Detectar primero si hay palabras temporales
+        tiene_mes = any(k in t for k in ["mes", "meses", "m."])
+        tiene_ano = any(k in t for k in ["año", "años", "anio", "anios", "a."])
+        
+        # Heurísticas de horizonte: si hay palabra temporal, el PRIMER número pequeño es horizonte
+        if tiene_mes:
+            candidatos = [int(x) for x in nums if x <= 120]  # hasta 120 meses (10 años)
             if candidatos:
                 horizonte_meses = candidatos[0]
-        if any(k in t for k in ["año", "años", "anio", "anios"]):
-            candidatos = [int(x) for x in nums if x <= 50]
+                # Remover de nums para no confundir con monto
+                nums = [x for x in nums if x != candidatos[0]]
+        elif tiene_ano:
+            candidatos = [int(x) for x in nums if x <= 50]  # hasta 50 años
             if candidatos:
                 horizonte_meses = candidatos[0] * 12
+                # Remover de nums para no confundir con monto
+                nums = [x for x in nums if x != candidatos[0]]
 
-        # Heurísticas de monto: elegir el mayor número que no sea el horizonte
+        # Heurísticas de monto: si queda algún número grande, es el monto
         if nums:
-            candidates = nums.copy()
-            if horizonte_meses is not None and float(horizonte_meses) in candidates:
-                candidates.remove(float(horizonte_meses))
-            if candidates:
-                monto = max(candidates)
+            # Si hay un número > 100, probablemente sea monto
+            grandes = [x for x in nums if x >= 100]
+            if grandes:
+                monto = max(grandes)
+            elif nums:
+                # Si solo hay números chicos y NO había palabra temporal, asumir que es monto
+                if not tiene_mes and not tiene_ano:
+                    monto = max(nums)
 
         # Recuperar contexto previo de inversiones si existe
         inv_ctx = self.conversation_state['partial_data'].get('inversion', {})

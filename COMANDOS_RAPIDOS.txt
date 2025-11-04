@@ -1,0 +1,134 @@
+### 🚀 GUÍA RÁPIDA - Comandos para ejecutar en tu ASUSTOR
+
+## Paso 1: Conectar por SSH
+Desde PowerShell en tu PC:
+```
+ssh admin@IP_DE_TU_NAS
+```
+(Reemplaza IP_DE_TU_NAS con la IP de tu ASUSTOR)
+
+## Paso 2: Verificar que tienes Docker
+```
+docker --version
+```
+
+Si NO tienes Docker:
+- Abre ADM (navegador)
+- App Central > Buscar "Docker CE" > Install
+- Espera 2-3 minutos a que instale
+
+## Paso 3: Ir al directorio del bot
+```
+cd /volume1/docker/chatbot
+```
+(O la ruta donde subiste la carpeta deploy-nas)
+
+## Paso 4: Ver archivos (verificar que están)
+```
+ls -la
+```
+
+Deberías ver:
+- Dockerfile
+- docker-compose.yml
+- web_app.py
+- chatbot_core.py
+- etc.
+
+## Paso 5: Dar permisos al script
+```
+chmod +x deploy.sh
+```
+
+## Paso 6: ¡Desplegar!
+```
+./deploy.sh
+```
+
+Este script hará automáticamente:
+✓ Construir la imagen Docker
+✓ Crear el contenedor
+✓ Iniciar el bot
+✓ Mostrar el estado
+
+## Paso 7: Verificar que funciona
+```
+docker ps
+```
+
+Deberías ver:
+```
+CONTAINER ID   IMAGE                    STATUS         PORTS
+xxxxx          chatbot-financiero       Up 10 seconds  0.0.0.0:5000->5000/tcp
+```
+
+## Paso 8: Ver logs
+```
+docker logs -f chatbot-financiero
+```
+
+Deberías ver:
+```
+* Serving Flask app 'web_app'
+* Running on http://0.0.0.0:5000
+```
+
+Para salir de los logs: Ctrl+C
+
+## Paso 9: Probar desde tu navegador
+Abre en tu PC:
+```
+http://IP_DE_TU_NAS:5000
+```
+
+¡Deberías ver la interfaz del chatbot!
+
+---
+
+## 🆘 Si algo sale mal
+
+### Error: "docker: command not found"
+Instala Docker CE desde App Central
+
+### Error: "Permission denied"
+```
+sudo chmod +x deploy.sh
+sudo ./deploy.sh
+```
+
+### Error: "Port 5000 already in use"
+```
+docker ps -a
+docker stop chatbot-financiero
+docker rm chatbot-financiero
+./deploy.sh
+```
+
+### Ver qué salió mal:
+```
+docker logs chatbot-financiero
+```
+
+---
+
+## 📱 Después de que funcione localmente
+
+### Configurar acceso externo con EZ-Connect:
+1. ADM > Settings > EZ Connect > Enable
+2. Anota tu dominio: xxx.myasustor.com
+3. Settings > EZ Router > Port Forwarding
+4. Puerto 5000 → 5000
+
+### Probar:
+```
+http://xxx.myasustor.com:5000
+```
+
+### Actualizar Twilio:
+```
+http://xxx.myasustor.com:5000/whatsapp-webhook
+```
+
+---
+
+¿Todo listo? ¡Copia y pega los comandos del Paso 1 en adelante!

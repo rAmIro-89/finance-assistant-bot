@@ -1,0 +1,100 @@
+﻿• 'Invertir mi aguinaldo'
+• 'Tengo deuda de $30000'
+• 'Qué es la inflación'
+
+Escribe tu consulta naturalmente ✨"
+2025-11-03T23:03:44,ayuda,neutral,none,Inflacion,"¡Hola! Soy tu asistente de educación financiera personal 💰
+
+¿En qué puedo ayudarte?
+
+📊 Presupuesto - Organiza ingresos y gastos
+🏦 Ahorro - Metas y estrategias
+📈 Inversiones - Guía según tu perfil
+💳 Deudas - Planes para salir
+🧮 Calculadora - Simuladores financieros
+🎓 Educación - Conceptos financieros
+
+💬 Ejemplos de lo que puedes decirme:
+• 'Presupuesto con $50000'
+• 'Quiero ahorrar para un auto'
+• 'Invertir mi aguinaldo'
+• 'Tengo deuda de $30000'
+• 'Qué es la inflación'
+
+Escribe tu consulta naturalmente ✨"
+2025-11-03T23:04:00,inversiones,neutral,none,Invertir 50000,"📈 Opciones de inversión:
+
+🟡 Riesgo Moderado (diversificado):
+• ETFs globales: Diversificación automática
+• Fondos balanceados: Mix de bonos y acciones
+• CEDEARs: Acciones extranjeras en pesos
+
+💰 Con $50,000 podrías:
+• Diversificar en 3-4 instrumentos
+• Invertir progresivamente (DCA)
+• Empezar conservador y aumentar riesgo
+
+¿Cuánto tiempo puedes dejar el dinero invertido? (ej: 7 meses o 2 años)"
+2025-11-03T23:04:14,inversiones,neutral,none,1 año,"📈 Opciones de inversión:
+
+🟡 Riesgo Moderado (diversificado):
+• ETFs globales: Diversificación automática
+• Fondos balanceados: Mix de bonos y acciones
+• CEDEARs: Acciones extranjeras en pesos
+
+💰 Con $1 podrías:
+• Diversificar en 3-4 instrumentos
+• Invertir progresivamente (DCA)
+• Empezar conservador y aumentar riesgo
+
+🕒 Horizonte: 12 meses (1.0 años)
+
+¿Querés que simulemos el rendimiento con interés compuesto? Podés decir 'dale' o indicar 'tasa 12% y ahorro mensual 5000'."
+2025-11-03T23:04:43,inversiones,neutral,motivado,Dale,"📈 Opciones de inversión:
+
+🟡 Riesgo Moderado (diversificado):
+• ETFs globales: Diversificación automática
+• Fondos balanceados: Mix de bonos y acciones
+• CEDEARs: Acciones extranjeras en pesos
+
+💰 Con $1 podrías:
+• Diversificar en 3-4 instrumentos
+• Invertir progresivamente (DCA)
+• Empezar conservador y aumentar riesgo
+
+🕒 Horizonte: 12 meses (1.0 años)
+
+🧮 Simulación con interés compuesto:
+
+💰 Capital inicial: $1
+🕒 Plazo: 1.0 años (12 meses)
+📈 Tasa: 12.0% anual (estimada)
+💸 Ahorro mensual: $0 (lo que sumás cada mes)
+
+🎯 Resultado estimado:
+• Total invertido: $1
+• Monto final: $1
+• Ganancia: $0 (12.68%)
+
+¿Querés ajustar la tasa o cambiar el ahorro mensual? Ejemplo: 'tasa 15% y ahorro 10000'."
+2025-11-03T23:05:23,ahorro,neutral,none,Ahorro mensual 10000,"¡Genial que quieras ahorrar! 🏦
+
+💡 Challenge 52 semanas: Semana 1 ahorra $100, semana 2 $200, y así...
+
+Metas populares:
+• 🆘 Fondo emergencia: 3-6 meses de gastos
+• ✈️ Viaje/Vacaciones: 3-12 meses
+• 🚗 Auto: 1-3 años
+• 🏠 Vivienda: 5-10 años
+
+¿Para qué quieres ahorrar? Escribe tu meta y el monto."
+2025-11-03T23:06:10,ahorro,neutral,none,Viaje 3 meses,"¡Excelente meta: ✈️ Viaje/Vacaciones! 🎯
+
+Para ahorrar $3:
+
+📅 En 10 meses: ahorra $0/mes
+📅 En 15 meses: ahorra $0/mes
+📅 En 20 meses: ahorra $0/mes
+
+💡 Tip: Automatiza una transferencia el día que cobras.
+¿En cuánto tiempo quieres lograrlo?"

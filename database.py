@@ -6,6 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, scoped_session
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 import secrets
 
 # Base de datos SQLite en el mismo directorio
@@ -69,7 +70,7 @@ def get_session():
     return SessionLocal()
 
 
-def get_or_create_user(phone: str, name: str | None = None) -> User:
+def get_or_create_user(phone: str, name: Optional[str] = None) -> User:
     """Busca o crea un usuario por phone/id. Actualiza last_interaction."""
     if not phone:
         phone = "web_user"
@@ -108,7 +109,7 @@ def update_user_fields(phone: str, **fields) -> None:
     session.close()
 
 
-def get_user(phone: str) -> User | None:
+def get_user(phone: str) -> Optional[User]:
     session = get_session()
     user = session.query(User).filter_by(phone=phone).first()
     if user:
@@ -155,7 +156,7 @@ def create_link_token(user_phone: str, ttl_minutes: int = 10) -> str:
     return token
 
 
-def claim_link_token(token: str) -> str | None:
+def claim_link_token(token: str) -> Optional[str]:
     """Valida y consume un token de vinculación; retorna user_phone o None."""
     session = get_session()
     lt = session.query(LinkToken).filter_by(token=token).first()
