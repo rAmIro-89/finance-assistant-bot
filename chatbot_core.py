@@ -295,6 +295,8 @@ class ChatBot:
         # Primero convertir "lucas" a miles antes de normalizar
         text_with_lucas = parse_lucas(text)
         t = normalize_text(text_with_lucas)
+        last = self.last_scenario
+        waiting = self.conversation_state.get('waiting_for')
 
         # 0) INTENCIONES PRIORITARIAS ANTES DEL MAPEO DIRECTO
         # Educación primero: si el usuario pide definiciones/explicaciones o quiere aprender, priorizar EDUCACION
@@ -336,6 +338,15 @@ class ChatBot:
         ]
         if any(re.search(pat, t) for pat in calc_patterns):
             return "calculadora"
+
+        # CONTEXTO: Si venimos hablando de INVERSIONES y el usuario menciona 'tasa', '%' o 'aporte/ahorro mensual',
+        # o meses/años con números, mantener INVERSIONES para evitar desvíos por la palabra 'ahorro'.
+        if last == "inversiones":
+            if any(kw in t for kw in ["tasa", "%", "aporte", "aporte mensual", "ahorro mensual", "mensual", "simula", "simular", "dale", "ok"]):
+                return "inversiones"
+            # Meses/años + número → sigue siendo inversiones
+            if (re.search(r"\d+", t) and any(kw in t for kw in ["mes", "meses", "anio", "anios", "año", "años"])):
+                return "inversiones"
 
         # PRIORIDAD: Preguntas de inversión con "dónde rinde", "dónde me conviene", "qué hago" + monto
         # Esto debe ir ANTES de ahorro para capturar "donde rinde mas" correctamente
@@ -396,9 +407,7 @@ class ChatBot:
                 if keyword in t:
                     return scenario
 
-        waiting = self.conversation_state.get('waiting_for')
         partial = self.conversation_state.get('partial_data', {})
-        last = self.last_scenario
 
         # MEJORA 3: Manejo robusto de respuestas cortas y contexto
         short_confirm = ["si", "sí", "no", "dale", "ok", "bueno", "claro", "genial", "perfecto"]
@@ -680,8 +689,13 @@ class ChatBot:
                 m_años = re.search(r"(\d+)\s*a[ñn]o", t)
                 if m_años:
                     meses = int(m_años.group(1)) * 12
-            elif nums:  # Solo un número, asumimos meses
-                meses = int(max(nums))
+            elif nums:
+                # Evitar confundir 'aporte/ahorro mensual' o 'tasa %' con plazo
+                if any(kw in t for kw in ["tasa", "%", "mensual", "aporte"]):
+                    meses = None
+                else:
+                    # Solo un número, en ausencia de otras pistas, asumimos meses
+                    meses = int(max(nums))
             
             if meses:
                 objetivo = self.conversation_state['partial_data'].get('monto', 0)
@@ -703,6 +717,9 @@ class ChatBot:
                     f"• Revisa tu progreso mensualmente\n\n"
                     f"💡 Si ahorras ${ahorro_mensual:,.0f}/mes, en {meses} meses tendrás ${objetivo:,.0f}!"
                 )
+            else:
+                # No se pudo extraer un plazo; pedir explícitamente el tiempo
+                return "¿En cuántos meses querés lograrlo? (ej: 6 meses o 2 años)"
         
         # CASO 4: Mensaje inicial genérico
         consejos = [
@@ -730,6 +747,35 @@ class ChatBot:
         # Convertir "lucas" primero
         text = parse_lucas(text)
         t = text.lower()
+        t_norm = normalize_text(text)
+
+        # Si estamos esperando explicar "cómo comprar bonos en dólares" o el usuario lo pide explícitamente
+        explain_bonos_patterns = [
+            r"como\s+comprar\s+bonos\s+en\s+dolares",
+            r"explica(r|me)?\s+.*comprar\s+bonos\s+.*dolares",
+            r"comprar\s+bonos\s+usd",
+            r"comprar\s+bonos\s+en\s+usd",
+            r"bonos\s+(usa|treasury)"
+        ]
+        if self.conversation_state.get('waiting_for') == 'explicar_bonos_usd' or any(re.search(p, t_norm) for p in explain_bonos_patterns):
+            self.conversation_state['waiting_for'] = None
+            guia = (
+                "🧭 Cómo comprar bonos en dólares (AR, guía general)\n\n"
+                "1) Abrí una cuenta en un broker regulado (BYMA/MAE).\n"
+                "2) Transferí pesos a tu cuenta del broker desde tu banco.\n"
+                "3) Conseguí USD vía dólar MEP (proceso típico):\n"
+                "   • Comprá AL30 (con pesos).\n"
+                "   • Cumplí el 'parking' vigente.\n"
+                "   • Vendé AL30D para obtener USD en tu cuenta del broker.\n"
+                "4) Con esos USD, comprá bonos en dólares (ej: AL30D/GD30D).\n"
+                "   • Alternativa: bonos corporativos USD que ofrezca tu broker.\n"
+                "5) Si buscás renta fija de EE.UU.: considerá ETFs de bonos vía CEDEAR (p.ej. IEF/TLT).\n"
+                "   • No son bonos directos, pero replican índices de bonos.\n\n"
+                "⚠️ Tené en cuenta: comisiones, plazos de 'parking' y regulaciones pueden cambiar.\n"
+                "   Consultá condiciones actuales en tu broker.\n\n"
+                "¿Querés que te ayude a simular un objetivo con estos bonos (monto y plazo)?"
+            )
+            return guia
         
         # DETECTAR ACTIVOS ESPECÍFICOS PRIMERO (respuestas especializadas)
         activo_oro = any(w in t for w in ["oro", "gold"])
@@ -786,6 +832,8 @@ class ChatBot:
             )
         
         if activo_dolar:
+            # Marcar contexto para explicar "cómo comprar bonos en dólares" si el usuario lo pide luego
+            self.conversation_state['waiting_for'] = 'explicar_bonos_usd'
             return (
                 "💵 **DÓLAR como inversión**\n\n"
                 "✅ **Ventajas:**\n"
@@ -1052,10 +1100,14 @@ class ChatBot:
                 )
 
                 sim += "¿Querés ajustar la tasa o cambiar el ahorro mensual? Ejemplo: 'tasa 15% y ahorro 10000'."
+                # Ya no estamos esperando datos para inversiones
+                self.conversation_state['waiting_for'] = None
                 return respuesta + sim
 
         # Si falta horizonte o monto, pedir lo que falte
         if monto is None and horizonte_meses is None:
+            # Esperamos que el usuario provea monto y/u horizonte
+            self.conversation_state['waiting_for'] = 'inversion_datos'
             return (
                 respuesta +
                 "Para personalizarlo, decime: \n"
@@ -1063,11 +1115,14 @@ class ChatBot:
                 "• Horizonte (ej: 7 meses o 2 años)\n"
             )
         if monto is None:
+            self.conversation_state['waiting_for'] = 'inversion_datos'
             return respuesta + "¿Con qué monto querés empezar a invertir? (ej: $150000)"
         if horizonte_meses is None:
+            self.conversation_state['waiting_for'] = 'inversion_datos'
             return respuesta + "¿Cuánto tiempo puedes dejar el dinero invertido? (ej: 7 meses o 2 años)"
 
         # Si tenemos ambos datos pero no pidió simular explícitamente, invitar a simular
+        self.conversation_state['waiting_for'] = 'inversion_simular'
         return (
             respuesta +
             "¿Querés que simulemos el rendimiento con interés compuesto? Podés decir 'dale' o indicar 'tasa 12% y ahorro mensual 5000'."
