@@ -1,4 +1,4 @@
-# 💰 Financial Assistant Chatbot | Chatbot Financiero
+# 💰 Financial Assistant Chatbot
 
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/flask-3.1-green.svg)](https://flask.palletsprojects.com/)
@@ -6,115 +6,194 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![WhatsApp](https://img.shields.io/badge/WhatsApp-Integration-25D366.svg)](https://www.twilio.com/whatsapp)
 
-[English](#english) | [Español](#español)
+AI-powered conversational financial education assistant with budget simulators, interactive dashboard, and persistent user memory. Deployable on NAS with Docker, accessible via web and WhatsApp.
 
----
+## Business Problem
 
-<a name="english"></a>
-## 🇬🇧 English
+**Objective:** Democratize financial literacy through an accessible, personalized AI assistant that helps users understand budgeting, savings, investments, and debt management.
 
-AI-powered financial education assistant with budget simulators, interactive dashboard, and per-user memory. Deployable on NAS with Docker. Available via web and WhatsApp.
+**Real-World Applications:**
+- **Financial Education:** Interactive chatbot teaches concepts like 50/30/20 rule, compound interest, investment vehicles (ETFs, mutual funds), and debt consolidation strategies
+- **Budget Planning:** Personalized budget simulators that adapt to user income, expenses, and financial goals
+- **Investment Guidance:** Compare investment scenarios (conservative vs aggressive portfolios) with visualizations showing long-term growth
+- **Debt Management:** Calculate payoff strategies, analyze refinancing options, and provide actionable debt reduction plans
+- **Multi-Channel Accessibility:** Available 24/7 via web dashboard and WhatsApp integration for on-the-go financial advice
 
-### Highlights
-- Conversational AI: intents (budget, savings, investments, debts, calculators, education), NLP, and context memory
-- Dashboard: 50/30/20 budget, compound interest, investment comparisons (Plotly)
-- Persistence: SQLite + SQLAlchemy (income, debts, risk, savings goals)
-- Identity: web cookie `uid`, WhatsApp phone-based ID, secure one-time link to connect WhatsApp → Web
-- Deployment: Docker + Compose, optimized for NAS, optional ngrok
+**Target Audience:** 
+- Young professionals seeking financial literacy
+- Individuals wanting to improve budgeting habits
+- Users exploring investment options without financial advisor costs
+- Spanish-speaking (Argentina) and English-speaking markets
 
-### Quick Start
-```bash
-docker-compose up -d
-curl http://localhost:5000/health
+**Technical Challenge:** Build an NLP system that understands financial intents, maintains conversation context across sessions, persists user data securely, and delivers accurate financial calculations with interactive visualizations.
+
+## Key Features
+
+### Conversational AI
+- **Intent Recognition:** Budget planning, savings goals, investments, debt management, financial calculators, and educational content
+- **NLP Processing:** Context-aware conversation memory that spans multiple sessions
+- **Multi-Language:** Supports Spanish (primary) and English
+- **Slang Understanding:** Recognizes financial slang (e.g., "lucas" = thousands in Argentina)
+
+### Interactive Dashboard
+- **50/30/20 Budget Rule:** Visual breakdown of needs, wants, and savings
+- **Compound Interest Calculator:** Project investment growth over time
+- **Investment Comparison:** Compare conservative vs aggressive portfolio scenarios
+- **Debt Analyzer:** Calculate payoff timelines and interest savings
+- **Built with Plotly:** Interactive, responsive charts
+
+### Data Persistence
+- **SQLite + SQLAlchemy:** Store user income, debts, risk profile, and savings goals
+- **User Identity:** Web cookie (`uid`), WhatsApp phone-based ID
+- **Secure Linking:** One-time tokens to connect WhatsApp → Web sessions
+
+### Deployment
+- **Docker Ready:** `docker-compose up -d` for quick deployment
+- **NAS Optimized:** Runs efficiently on ASUSTOR/Synology/QNAP NAS devices
+- **Optional Ngrok:** Public URL tunneling for WhatsApp webhooks
+
+## Architecture
+
 ```
-Access: Chat http://localhost:5000/ · Dashboard http://localhost:5000/dashboard
+finance-assistant-bot/
+├── chatbot_core.py          # Main NLP intent recognition engine
+├── calculators.py           # Financial calculators (compound interest, payoff schedules)
+├── visualizations.py        # Plotly chart generation
+├── database.py              # SQLAlchemy models and session management
+├── web_app.py               # Flask web server and API endpoints
+├── templates/
+│   └── chat.html            # Web chat interface
+├── tests/                   # Comprehensive test suite
+├── docs/
+│   └── DEPLOY_NAS.md        # NAS deployment guide
+├── docker-compose.yml       # Docker orchestration
+├── Dockerfile               # Container definition
+└── requirements.txt         # Python dependencies
+```
 
-### Endpoints
-- GET `/` chat UI
-- POST `/api/chat` process chat messages
-- GET `/dashboard` interactive charts
-- GET `/health` health check
-- GET `/api/user` current profile
-- POST `/api/login` (dni or nickname)
-- POST `/api/logout`
-- POST `/whatsapp-webhook` Twilio inbound
-- GET `/claim/<token>` link WhatsApp → web session
+## Quick Start
 
-### WhatsApp
-1) Set Twilio webhook to `https://YOUR_DOMAIN/whatsapp-webhook`
-2) Send "vincular" on WhatsApp to receive a one-time link
-3) Open the link to auto-login on the web dashboard
-
-### NAS Deployment
-See: docs/DEPLOY_NAS.md
-
-### Testing
+### Local Development
 ```bash
+# Install dependencies
 pip install -r requirements.txt
-pytest -q
+
+# Run Flask development server
+python web_app.py
+
+# Access application
+# Chat: http://localhost:5000/
+# Dashboard: http://localhost:5000/dashboard
+# Health Check: http://localhost:5000/health
 ```
 
----
-
-<a name="español"></a>
-## 🇦🇷 Español
-
-Asistente educativo financiero con simuladores, dashboard y memoria por usuario. Desplegable en NAS con Docker. Disponible por web y WhatsApp.
-
-### Destacados
-- IA Conversacional: intenciones (presupuesto, ahorro, inversiones, deudas, calculadoras, educación), PLN y memoria de contexto
-- Dashboard: regla 50/30/20, interés compuesto, comparación de inversiones (Plotly)
-- Persistencia: SQLite + SQLAlchemy (ingresos, deudas, perfil de riesgo, metas de ahorro)
-- Identidad: cookie `uid` en web, ID por número en WhatsApp, enlace único para vincular WA→Web
-- Despliegue: Docker + Compose, optimizado para NAS, ngrok opcional
-
-### Inicio Rápido
+### Docker Deployment
 ```bash
+# Build and run containers
 docker-compose up -d
+
+# Verify health
 curl http://localhost:5000/health
+
+# View logs
+docker-compose logs -f
 ```
-Acceso: Chat http://localhost:5000/ · Dashboard http://localhost:5000/dashboard
 
-### Endpoints
-- GET `/` interfaz de chat
-- POST `/api/chat` procesamiento de mensajes
-- GET `/dashboard` gráficos interactivos
-- GET `/health` estado
-- GET `/api/user` perfil actual
-- POST `/api/login` (dni o nickname)
-- POST `/api/logout`
-- POST `/whatsapp-webhook` webhook de Twilio
-- GET `/claim/<token>` vincula WhatsApp → web
+### WhatsApp Integration (Optional)
+1. **Set up Twilio:**
+   - Configure webhook URL: `https://YOUR_DOMAIN/whatsapp-webhook`
+   - Enable WhatsApp sandbox or production number
 
-### WhatsApp
-1) Configurá en Twilio el webhook: `https://TU_DOMINIO/whatsapp-webhook`
-2) Enviá "vincular" por WhatsApp para recibir un enlace único
-3) Abrí el enlace para ingresar directo al dashboard
+2. **Link WhatsApp to Web:**
+   - Send "vincular" via WhatsApp
+   - Receive one-time secure link
+   - Open link to auto-login to web dashboard
 
-### Despliegue en NAS
-Guía: docs/DEPLOY_NAS.md
+3. **Use via WhatsApp:**
+   - Send financial questions directly
+   - Receive personalized advice and calculations
+   - Access full conversation history on web
 
-### Testing
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | Web chat interface |
+| POST | `/api/chat` | Process chat messages (JSON) |
+| GET | `/dashboard` | Interactive financial dashboard |
+| GET | `/health` | Health check endpoint |
+| GET | `/api/user` | Get current user profile |
+| POST | `/api/login` | Login (DNI or nickname) |
+| POST | `/api/logout` | Logout current session |
+| POST | `/whatsapp-webhook` | Twilio WhatsApp webhook |
+| GET | `/claim/<token>` | Link WhatsApp to web session |
+
+## Testing
+
+Comprehensive test suite covering:
+- Intent recognition accuracy
+- Financial calculator correctness
+- Context memory persistence
+- API endpoint responses
+- WhatsApp webhook handling
+
 ```bash
+# Install test dependencies
 pip install -r requirements.txt
-pytest -q
+
+# Run all tests
+pytest -v
+
+# Run specific test categories
+pytest tests/test_chatbot_core.py -v
+pytest tests/test_complex_v2_4.py -v
+
+# Generate test report
+python generate_test_report.py
 ```
 
----
+## NAS Deployment
 
-## Operations & Validation
+Optimized for home/office NAS deployment (ASUSTOR, Synology, QNAP):
 
-- Logs: how to analyze and keep them out of Git — see LOGS_ANALISIS.md
-- Production validation checklist:
-	1) Deploy changes and restart container
-	2) Open `/debug` to confirm SHA1 and timestamps
-	3) Run targeted tests (travel→ahorro, acronyms→educación, short replies keep context)
+1. **Transfer files to NAS:** Upload via SSH/SMB
+2. **Install Docker:** Enable Container Manager on NAS
+3. **Configure port:** Edit `docker-compose.yml` if port 5000 conflicts
+4. **Deploy:** Run `docker-compose up -d`
+5. **Optional Ngrok:** For WhatsApp integration, configure ngrok tunnel
+
+See detailed guide: `docs/DEPLOY_NAS.md`
 
 ## Recent Improvements
-- Travel intent routed to savings: "quiero viajar a…", "conocer/ir/visitar …" → ahorro
-- Acronyms → education: CER/UVA/TNA/TEA/CFT directly; FCI/CEDEAR/ETF if "?" or "qué es"
-- Short replies and numbers respect conversation context (e.g., "24 meses", "si", amounts)
-- Slang parsing: "lucas" recognized as thousands (e.g., "200 lucas" → 200,000)
+
+- **Travel Intent → Savings:** "quiero viajar a…", "conocer/ir/visitar …" now route to savings calculators
+- **Acronym Recognition:** CER/UVA/TNA/TEA/CFT trigger educational content; FCI/CEDEAR/ETF handled contextually
+- **Context Retention:** Short replies ("24 meses", "si", numbers) maintain conversation flow
+- **Slang Parsing:** Financial slang like "lucas" (thousands) correctly interpreted (e.g., "200 lucas" → 200,000)
+- **Production Validation:** `/debug` endpoint shows deployment SHA1 and timestamps for version tracking
+
+## Technologies Used
+
+- **Python 3.12:** Core application language
+- **Flask 2.3+:** Web framework and API
+- **Twilio:** WhatsApp Business API integration
+- **SQLite + SQLAlchemy:** Database and ORM
+- **Plotly 5.18+:** Interactive data visualizations
+- **Docker:** Containerization
+- **Pytest:** Testing framework
+
+## Documentation
+
+- **`ESTRUCTURA_PROYECTO.md`:** Detailed project structure
+- **`GUIA_DEMO.md`:** Demo presentation guide
+- **`LOGS_ANALISIS.md`:** Log analysis and debugging
+- **`docs/DEPLOY_NAS.md`:** NAS deployment instructions
+- **`TIPS_PRESENTACION.md`:** Presentation tips for showcasing
 
 ## License
-MIT — see LICENSE. Author: Ramiro Ottone Villar
+
+MIT License - See LICENSE file for details.
+
+**Author:** Ramiro Ottone Villar  
+**Portfolio Project:** Canadian Tech Market  
+**Status:** Production-ready with Docker deployment

@@ -1,7 +1,20 @@
+# Web Framework
 Flask>=2.3,<4
+
+# WhatsApp Integration
 twilio>=9,<10
+
+# Data Visualization
 plotly>=5.18,<6
+
+# Database
 sqlalchemy>=2.0,<3
+
+# Testing
 pytest>=7,<9
+
+# HTTP Client
 requests>=2.31,<3
+
+# CLI Formatting
 colorama>=0.4.6,<1
