@@ -183,22 +183,22 @@ python web_app.py
 ## 📸 Screenshots
 
 ### Welcome Screen & Main Capabilities
-![Home screen – Finance Assistant 24/7](img/01-home-intro.png)
+![Home screen – Finance Assistant 24/7](img/01-home-intro.jpg)
 
 ### Debt Payoff Planner Flow
-![Debt planner conversation flow](img/02-debt-flow.png)
+![Debt planner conversation flow](img/02-debt-flow.jpg)
 
 ### Extreme Case Example – Unrealistic Payment Plan
-![Extreme payoff example – 150000 debt, 1 per month](img/03-debt-extreme-case.png)
+![Extreme payoff example – 150000 debt, 1 per month](img/03-debt-extreme-case.jpg)
 
 ### Investment Recommendations
-![Investment options for a moderate risk profile](img/04-investments.png)
+![Investment options for a moderate risk profile](img/04-investments.jpg)
 
 ### Financial Calculator Menu
-![Financial calculator menu](img/05-calculator.png)
+![Financial calculator menu](img/05-calculator.jpg)
 
 ### Analytics Dashboard
-![Dashboard – User interactions, sentiment analysis, topic distribution](img/06-dashboard.png)
+![Dashboard – User interactions, sentiment analysis, topic distribution](img/06-dashboard.jpg)
 
 ---
 
