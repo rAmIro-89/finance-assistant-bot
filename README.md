@@ -7,7 +7,7 @@
 [![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?style=flat&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A **production-grade personal finance assistant chatbot** for Spanish-speaking users. Accessible 24/7 via WhatsApp or web chat, providing intelligent guidance on budgeting, debt management, investments, and financial planning.
+**A deployable personal finance assistant chatbot for Spanish-speaking users, built with Flask, SQLite, Docker, web chat, and optional WhatsApp integration through Twilio.**
 
 ---
 
